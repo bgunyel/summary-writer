@@ -1,0 +1,32 @@
+[project]
+name = "summary-writer"
+version = "0.1.0"
+description = "Makes research and writes a short summary about a given topic"
+readme = "README.md"
+authors = [
+    { name = "Bertan Günyel", email = "bertan.gunyel@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "ai-common @ git+https://github.com/bgunyel/ai-common.git@main",
+    "langchain>=0.3.24",
+    "langchain-core>=0.3.56",
+    "langchain-groq>=0.3.2",
+    "langchain-openai>=0.3.16",
+    "langgraph>=0.3.34",
+    "openai>=1.78.0",
+    "pydantic>=2.11.3",
+    "pydantic-settings>=2.9.1",
+    "rich>=14.0.0",
+    "tavily-python>=0.7.0",
+]
+
+[project.scripts]
+business-researcher = "summary_writer:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
