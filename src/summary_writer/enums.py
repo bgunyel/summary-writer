@@ -6,7 +6,7 @@ class Node(Enum):
     PLANNER = 'planner'
     QUERY_WRITER = 'query_writer'
     RESET = 'reset'
-    SUMMARY_WRITER = 'summary_writer'
-    SUMMARY_REVIEWER = 'summary_reviewer'
+    REVIEWER = 'reviewer'
     WEB_SEARCH = 'web_search'
+    WRITER = 'writer'
 

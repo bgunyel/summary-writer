@@ -10,6 +10,7 @@ from .state import SummaryState
 from .configuration import Configuration
 from .enums import Node
 from .components.query_writer import QueryWriter
+from .components.writer import Writer
 
 
 def route_research(state: SummaryState, config: RunnableConfig) -> Literal["continue_research", "end_research"]:
@@ -35,8 +36,9 @@ class SummaryWriter(GraphBase):
                                     search_category = config.search_category,
                                     number_of_days_back = config.number_of_days_back,
                                     include_raw_content = True)
+
+        self.writer = Writer(llm_server=llm_server, model_params=llm_config)
         """
-        self.summary_writer = SummaryWriter(model_name=settings.LANGUAGE_MODEL, context_window_length=config.context_window_length)
         self.summary_reviewer = SummaryReviewer(model_name=settings.REASONING_MODEL, context_window_length=config.context_window_length)
         """
         self.graph = self.build_graph()
@@ -48,7 +50,6 @@ class SummaryWriter(GraphBase):
         state.source_str = source_str
         state.unique_sources = unique_sources
         return state
-
 
     def get_response(self, input_dict: dict[str, Any], verbose: bool = False) -> str:
         config = {"configurable": {"thread_id": str(uuid4())}}
@@ -66,21 +67,20 @@ class SummaryWriter(GraphBase):
         out_state = self.graph.invoke(in_state, config)
         return out_state['content']
 
-
     def build_graph(self):
         workflow = StateGraph(SummaryState, config_schema=Configuration)
 
         ## Nodes
         workflow.add_node(node=Node.QUERY_WRITER.value, action=self.query_writer.run)
         workflow.add_node(node=Node.WEB_SEARCH.value, action=self.web_search_run)
-        # workflow.add_node(node=Node.SUMMARY_WRITER.value, action=self.summary_writer.run)
+        workflow.add_node(node=Node.WRITER.value, action=self.writer.run)
         # workflow.add_node(node=Node.SUMMARY_REVIEWER.value, action=self.summary_reviewer.run)
 
         ## Edges
         workflow.add_edge(start_key=START, end_key=Node.QUERY_WRITER.value)
         workflow.add_edge(start_key=Node.QUERY_WRITER.value, end_key=Node.WEB_SEARCH.value)
-        workflow.add_edge(start_key=Node.WEB_SEARCH.value, end_key=END)
-        # workflow.add_edge(start_key=Node.SUMMARY_WRITER.value, end_key=Node.SUMMARY_REVIEWER.value)
+        workflow.add_edge(start_key=Node.WEB_SEARCH.value, end_key=Node.WRITER.value)
+        workflow.add_edge(start_key=Node.WRITER.value, end_key=END)
 
         """
         workflow.add_conditional_edges(
