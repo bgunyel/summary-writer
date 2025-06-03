@@ -1,10 +1,16 @@
 [project]
 name = "summary-writer"
 version = "0.1.0"
-description = "Makes research and writes a short summary about a given topic"
+description = """
+An AI-powered research tool that automatically generates comprehensive summaries on any topic by intelligently searching the web
+and synthesizing information using large language models.
+"""
 readme = "README.md"
 authors = [
     { name = "Bertan Günyel", email = "bertan.gunyel@gmail.com" }
+]
+urls = [
+    {repository = "https://github.com/bgunyel/summary-writer"}
 ]
 requires-python = ">=3.11"
 dependencies = [
