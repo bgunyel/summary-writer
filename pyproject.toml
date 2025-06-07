@@ -9,9 +9,6 @@ readme = "README.md"
 authors = [
     { name = "Bertan Günyel", email = "bertan.gunyel@gmail.com" }
 ]
-urls = [
-    {repository = "https://github.com/bgunyel/summary-writer"}
-]
 requires-python = ">=3.11"
 dependencies = [
     "ai-common @ git+https://github.com/bgunyel/ai-common.git@main",
@@ -26,6 +23,9 @@ dependencies = [
     "rich>=14.0.0",
     "tavily-python>=0.7.0",
 ]
+
+[project.urls]
+repository = "https://github.com/bgunyel/summary-writer"
 
 [project.scripts]
 business-researcher = "summary_writer:main"
