@@ -43,7 +43,7 @@ class SummaryWriter(GraphBase):
         """
         self.graph = self.build_graph()
 
-    def web_search_run(self, state: SummaryState) -> SummaryState:
+    def web_search_node(self, state: SummaryState) -> SummaryState:
         unique_sources = self.web_search.search(search_queries=[query.search_query for query in state.search_queries])
         source_str = format_sources(unique_sources=unique_sources, max_tokens_per_source=5000, include_raw_content=True)
         state.steps.append(Node.WEB_SEARCH.value)
@@ -51,28 +51,35 @@ class SummaryWriter(GraphBase):
         state.unique_sources = unique_sources
         return state
 
-    def get_response(self, input_dict: dict[str, Any], verbose: bool = False) -> str:
-        config = {"configurable": {"thread_id": str(uuid4())}}
-
+    def run(self, topic: str, config: RunnableConfig) -> dict[str, Any]:
         in_state = SummaryState(
-            content = '',
+            content='',
             iteration=0,
-            search_queries = [],
-            source_str = '',
-            steps = [],
+            search_queries=[],
+            source_str='',
+            steps=[],
             summary_exists=False,
-            topic = input_dict['topic'],
+            topic=topic,
             unique_sources={},
         )
         out_state = self.graph.invoke(in_state, config)
-        return out_state['content']
+        out_dict = {
+            'content': out_state['content'],
+            'unique_sources': out_state['unique_sources'],
+        }
+        return out_dict
+
+    def get_response(self, input_dict: dict[str, Any], verbose: bool = False) -> str:
+        config = {"configurable": {"thread_id": str(uuid4())}}
+        out_dict = self.run(topic = input_dict["topic"], config = config)
+        return out_dict['content']
 
     def build_graph(self):
         workflow = StateGraph(SummaryState, config_schema=Configuration)
 
         ## Nodes
         workflow.add_node(node=Node.QUERY_WRITER.value, action=self.query_writer.run)
-        workflow.add_node(node=Node.WEB_SEARCH.value, action=self.web_search_run)
+        workflow.add_node(node=Node.WEB_SEARCH.value, action=self.web_search_node)
         workflow.add_node(node=Node.WRITER.value, action=self.writer.run)
         # workflow.add_node(node=Node.SUMMARY_REVIEWER.value, action=self.summary_reviewer.run)
 

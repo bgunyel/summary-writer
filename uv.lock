@@ -9,7 +9,7 @@ resolution-markers = [
 [[package]]
 name = "ai-common"
 version = "0.1.0"
-source = { git = "https://github.com/bgunyel/ai-common.git?rev=main#5765b163d9f0856646824f11c2059f4ac5940b54" }
+source = { git = "https://github.com/bgunyel/ai-common.git?rev=main#5b4d614505c8a079e778a36bf7987ad8482ea69e" }
 dependencies = [
     { name = "langchain-anthropic" },
     { name = "langchain-core" },
