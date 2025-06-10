@@ -22,5 +22,6 @@ class SummaryState(BaseModel):
     source_str: str
     steps: list[str]
     summary_exists: bool = False
+    token_usage: dict
     topic: str
     unique_sources: dict[str, Any]

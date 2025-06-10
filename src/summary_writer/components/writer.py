@@ -2,6 +2,7 @@ import copy
 from typing import Any
 
 from langchain_core.runnables import RunnableConfig
+from langchain_core.callbacks import get_usage_metadata_callback
 from ai_common import LlmServers, get_llm, strip_thinking_tokens
 
 from ..enums import Node
@@ -86,22 +87,26 @@ Think carefully about the provided search results first. Then update the existin
 
 class Writer:
     def __init__(self, llm_server: LlmServers, model_params: dict[str, Any]):
-        model_params['model_name'] = model_params['reasoning_model']
+        self.model_name = model_params['reasoning_model']
+        model_params['model_name'] = self.model_name
         self.writer_llm = get_llm(llm_server=llm_server, model_params=model_params)
 
     def run(self, state: SummaryState, config: RunnableConfig) -> SummaryState:
 
-        configurable = Configuration.from_runnable_config(config=config)
+        configurable = Configuration.from_runnable(runnable=config)
 
         if state.summary_exists: # Extending existing summary
             instructions = EXTENDING_INSTRUCTIONS.format(topic=state.topic, summary=state.content, search_results=state.source_str)
         else: # Writing a new summary
             instructions = WRITING_INSTRUCTIONS.format(topic=state.topic, context=state.source_str)
 
-        summary = self.writer_llm.invoke(instructions)
-        state.steps.append(Node.WRITER.value)
-        state.summary_exists = True
-        state.content = copy.deepcopy(summary.content)
+        with get_usage_metadata_callback() as cb:
+            summary = self.writer_llm.invoke(instructions)
+            state.token_usage[self.model_name]['input_tokens'] += cb.usage_metadata[self.model_name]['input_tokens']
+            state.token_usage[self.model_name]['output_tokens'] += cb.usage_metadata[self.model_name]['output_tokens']
+            state.steps.append(Node.WRITER.value)
+            state.summary_exists = True
+            state.content = copy.deepcopy(summary.content)
 
         if configurable.strip_thinking_tokens:
             state.content = strip_thinking_tokens(text=state.content)

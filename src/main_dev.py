@@ -1,11 +1,13 @@
 import datetime
 import time
-import rich
+from uuid import uuid4
+from typing import TypedDict
 
 from config import settings
-from ai_common import Engine
 from src.summary_writer import SummaryWriter
-from ai_common import LlmServers
+from src.summary_writer.configuration import Configuration
+from ai_common import LlmServers, TavilySearchCategory
+
 
 
 def main():
@@ -40,6 +42,7 @@ def main():
     language_model = llm_config[llm_server.value].get('language_model', '')
     reasoning_model = llm_config[llm_server.value].get('reasoning_model', '')
 
+    """
     engine = Engine(
         responder=SummaryWriter(
             llm_server = llm_server,
@@ -51,18 +54,38 @@ def main():
         llm_base_url=llm_config[llm_server.value].get('llm_base_url', ''),
         save_to_folder=settings.OUT_FOLDER
     )
+    """
 
+    topic = 'first 100 days of Trump administration'
     print(f'LLM Server: {llm_server.value}')
     print(f'Language Model: {language_model}')
     print(f'Reasoning Model: {reasoning_model}')
+    print('\n')
+    print(f'Topic: {topic}')
     print('\n\n\n')
 
-    input_dict = {'topic': 'first 100 days of Trump administration'}
-    rich.print(input_dict)
+    config = {
+        "configurable": {
+            'thread_id': str(uuid4()),
+            'max_iterations': 3,
+            'max_results_per_query': 4,
+            'max_tokens_per_source': 10000,
+            'number_of_days_back': 1e6,
+            'number_of_queries': 3,
+            'search_category': 'general',
+            'strip_thinking_tokens': True,
+            }
+        }
 
-    engine.save_flow_chart(save_to_folder=settings.OUT_FOLDER)
-    response = engine.get_response(input_dict=input_dict)
-    rich.print(response)
+    summary_writer = SummaryWriter(llm_server = llm_server,
+                                   llm_config = llm_config[llm_server.value],
+                                   web_search_api_key = settings.TAVILY_API_KEY,
+                                   search_category=config['configurable']['search_category'],
+                                   number_of_days_back=config['configurable']['number_of_days_back'])
+
+
+    out_dict = summary_writer.run(topic=topic, config=config)
+
 
     dummy = -32
 

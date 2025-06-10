@@ -4,7 +4,7 @@ from typing import Literal, Any
 
 from langgraph.graph import START, END, StateGraph
 from langchain_core.runnables import RunnableConfig
-from ai_common import GraphBase, WebSearch, LlmServers, format_sources
+from ai_common import GraphBase, WebSearch, LlmServers, format_sources, TavilySearchCategory
 
 from .state import SummaryState
 from .configuration import Configuration
@@ -17,7 +17,7 @@ def route_research(state: SummaryState, config: RunnableConfig) -> Literal["cont
     """ Route the research based on the follow-up query """
 
     configurable = Configuration.from_runnable_config(config=config)
-    if state.iteration <= configurable.research_iterations:
+    if state.iteration <= configurable.max_iterations:
         return "continue_research"
     else:
         return "end_research"
@@ -29,12 +29,17 @@ class SummaryWriter(GraphBase):
     Reproduction from https://github.com/langchain-ai/ollama-deep-researcher
     """
 
-    def __init__(self, llm_server: LlmServers, llm_config: dict[str, Any], web_search_api_key: str) -> None:
-        config = Configuration()
+    def __init__(self,
+                 llm_server: LlmServers,
+                 llm_config: dict[str, Any],
+                 web_search_api_key: str,
+                 search_category: TavilySearchCategory,
+                 number_of_days_back: int) -> None:
+        self.models = list({llm_config['language_model'], llm_config['reasoning_model']})
         self.query_writer = QueryWriter(llm_server=llm_server, model_params=llm_config)
         self.web_search = WebSearch(api_key = web_search_api_key,
-                                    search_category = config.search_category,
-                                    number_of_days_back = config.number_of_days_back,
+                                    search_category = search_category,
+                                    number_of_days_back = number_of_days_back,
                                     include_raw_content = True)
 
         self.writer = Writer(llm_server=llm_server, model_params=llm_config)
@@ -59,6 +64,7 @@ class SummaryWriter(GraphBase):
             source_str='',
             steps=[],
             summary_exists=False,
+            token_usage={m: {'input_tokens': 0, 'output_tokens': 0} for m in self.models},
             topic=topic,
             unique_sources={},
         )
@@ -66,6 +72,7 @@ class SummaryWriter(GraphBase):
         out_dict = {
             'content': out_state['content'],
             'unique_sources': out_state['unique_sources'],
+            'token_usage': out_state['token_usage'],
         }
         return out_dict
 

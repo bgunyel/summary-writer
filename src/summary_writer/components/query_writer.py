@@ -1,6 +1,7 @@
 import datetime
 from typing import Any
 from langchain_core.runnables import RunnableConfig
+from langchain_core.callbacks import get_usage_metadata_callback
 
 from ai_common import LlmServers, Queries, get_llm
 from ..enums import Node
@@ -37,7 +38,8 @@ Generate targeted web search queries that will gather specific information about
 
 class QueryWriter:
     def __init__(self, llm_server: LlmServers, model_params: dict[str, Any]):
-        model_params['model_name'] = model_params['language_model']
+        self.model_name = model_params['language_model']
+        model_params['model_name'] = self.model_name
         self.base_llm = get_llm(llm_server=llm_server, model_params=model_params)
         self.structured_llm = self.base_llm.with_structured_output(Queries)
 
@@ -47,12 +49,15 @@ class QueryWriter:
             :param state: The current flow state
             :param config: The configuration
         """
-        configurable = Configuration.from_runnable_config(config=config)
-        state.steps.append(Node.QUERY_WRITER.value)
 
+        configurable = Configuration.from_runnable(runnable=config)
+        state.steps.append(Node.QUERY_WRITER.value)
         instructions = QUERY_WRITER_INSTRUCTIONS.format(topic=state.topic,
                                                         today=datetime.date.today().isoformat(),
                                                         number_of_queries=configurable.number_of_queries)
-        results = self.structured_llm.invoke(instructions)
+        with get_usage_metadata_callback() as cb:
+            results = self.structured_llm.invoke(instructions)
+            state.token_usage[self.model_name]['input_tokens'] += cb.usage_metadata[self.model_name]['input_tokens']
+            state.token_usage[self.model_name]['output_tokens'] += cb.usage_metadata[self.model_name]['output_tokens']
         state.search_queries = results.queries
         return state
