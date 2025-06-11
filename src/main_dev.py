@@ -1,13 +1,11 @@
 import datetime
 import time
 from uuid import uuid4
-from typing import TypedDict
 
 from config import settings
 from src.summary_writer import SummaryWriter
 from src.summary_writer.configuration import Configuration
-from ai_common import LlmServers, TavilySearchCategory
-
+from ai_common import LlmServers, PRICE_USD_PER_MILLION_TOKENS
 
 
 def main():
@@ -79,13 +77,14 @@ def main():
 
     summary_writer = SummaryWriter(llm_server = llm_server,
                                    llm_config = llm_config[llm_server.value],
-                                   web_search_api_key = settings.TAVILY_API_KEY,
-                                   search_category=config['configurable']['search_category'],
-                                   number_of_days_back=config['configurable']['number_of_days_back'])
+                                   web_search_api_key = settings.TAVILY_API_KEY)
 
 
     out_dict = summary_writer.run(topic=topic, config=config)
 
+    price_dict = {k:PRICE_USD_PER_MILLION_TOKENS[llm_server.value][k] for k in out_dict['token_usage'].keys()}
+    total_cost = sum([price_dict[k][p] * out_dict['token_usage'][k][p] for k in price_dict.keys() for p in price_dict[k].keys()]) / 1e6
+    print(f'Total Token Usage Cost: {total_cost:.4f} USD')
 
     dummy = -32
 

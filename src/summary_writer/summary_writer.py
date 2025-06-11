@@ -1,15 +1,14 @@
 from uuid import uuid4
-from pprint import pprint
-from typing import Literal, Any
+from typing import Literal, Any, Final
 
 from langgraph.graph import START, END, StateGraph
 from langchain_core.runnables import RunnableConfig
-from ai_common import GraphBase, WebSearch, LlmServers, format_sources, TavilySearchCategory
+from ai_common import GraphBase, LlmServers, format_sources, TavilySearchCategory
+from ai_common.components import QueryWriter, WebSearchNode
 
 from .state import SummaryState
-from .configuration import Configuration
 from .enums import Node
-from .components.query_writer import QueryWriter
+from .configuration import Configuration
 from .components.writer import Writer
 
 
@@ -32,29 +31,22 @@ class SummaryWriter(GraphBase):
     def __init__(self,
                  llm_server: LlmServers,
                  llm_config: dict[str, Any],
-                 web_search_api_key: str,
-                 search_category: TavilySearchCategory,
-                 number_of_days_back: int) -> None:
+                 web_search_api_key: str) -> None:
         self.models = list({llm_config['language_model'], llm_config['reasoning_model']})
-        self.query_writer = QueryWriter(llm_server=llm_server, model_params=llm_config)
-        self.web_search = WebSearch(api_key = web_search_api_key,
-                                    search_category = search_category,
-                                    number_of_days_back = number_of_days_back,
-                                    include_raw_content = True)
-
+        self.configuration_module_prefix: Final = 'src.summary_writer.configuration'
+        self.query_writer = QueryWriter(llm_server = llm_server,
+                                        model_params = llm_config,
+                                        configuration_module_prefix = self.configuration_module_prefix)
+        self.web_search_node = WebSearchNode(llm_server = llm_server,
+                                             model_params = llm_config,
+                                             web_search_api_key = web_search_api_key,
+                                             configuration_module_prefix = self.configuration_module_prefix)
+        # self.web_search = WebSearch(api_key = web_search_api_key)
         self.writer = Writer(llm_server=llm_server, model_params=llm_config)
         """
         self.summary_reviewer = SummaryReviewer(model_name=settings.REASONING_MODEL, context_window_length=config.context_window_length)
         """
         self.graph = self.build_graph()
-
-    def web_search_node(self, state: SummaryState) -> SummaryState:
-        unique_sources = self.web_search.search(search_queries=[query.search_query for query in state.search_queries])
-        source_str = format_sources(unique_sources=unique_sources, max_tokens_per_source=5000, include_raw_content=True)
-        state.steps.append(Node.WEB_SEARCH.value)
-        state.source_str = source_str
-        state.unique_sources = unique_sources
-        return state
 
     def run(self, topic: str, config: RunnableConfig) -> dict[str, Any]:
         in_state = SummaryState(
@@ -86,7 +78,7 @@ class SummaryWriter(GraphBase):
 
         ## Nodes
         workflow.add_node(node=Node.QUERY_WRITER.value, action=self.query_writer.run)
-        workflow.add_node(node=Node.WEB_SEARCH.value, action=self.web_search_node)
+        workflow.add_node(node=Node.WEB_SEARCH.value, action=self.web_search_node.run)
         workflow.add_node(node=Node.WRITER.value, action=self.writer.run)
         # workflow.add_node(node=Node.SUMMARY_REVIEWER.value, action=self.summary_reviewer.run)
 

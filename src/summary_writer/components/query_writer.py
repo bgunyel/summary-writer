@@ -6,7 +6,8 @@ from langchain_core.callbacks import get_usage_metadata_callback
 from ai_common import LlmServers, Queries, get_llm
 from ..enums import Node
 from ..state import SummaryState
-from ..configuration import Configuration
+# from ..configuration import Configuration
+from ai_common.utils import get_config_from_runnable
 
 
 QUERY_WRITER_INSTRUCTIONS = """
@@ -37,8 +38,9 @@ Generate targeted web search queries that will gather specific information about
 
 
 class QueryWriter:
-    def __init__(self, llm_server: LlmServers, model_params: dict[str, Any]):
+    def __init__(self, llm_server: LlmServers, model_params: dict[str, Any], configuration_file_directory: str):
         self.model_name = model_params['language_model']
+        self.configuration_file_directory = configuration_file_directory
         model_params['model_name'] = self.model_name
         self.base_llm = get_llm(llm_server=llm_server, model_params=model_params)
         self.structured_llm = self.base_llm.with_structured_output(Queries)
@@ -50,7 +52,8 @@ class QueryWriter:
             :param config: The configuration
         """
 
-        configurable = Configuration.from_runnable(runnable=config)
+        # configurable = Configuration.from_runnable(runnable=config)
+        configurable = get_config_from_runnable(configuration_module_prefix = 'src.summary_writer.configuration', config = config)
         state.steps.append(Node.QUERY_WRITER.value)
         instructions = QUERY_WRITER_INSTRUCTIONS.format(topic=state.topic,
                                                         today=datetime.date.today().isoformat(),
