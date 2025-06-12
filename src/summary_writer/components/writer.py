@@ -27,8 +27,8 @@ The context you are going to use:
 </context>
 
 <Requirements>
-1. Highlight the most relevant information from each source.
-2. Provide a concise overview of the key points related to the topic.
+1. Highlight every relevant information from each source.
+2. Provide a detailed overview of the key points related to the topic.
 3. Emphasize significant findings or insights.
 4. Ensure a coherent flow of information.
 </Requirements>

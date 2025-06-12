@@ -9,7 +9,7 @@ resolution-markers = [
 [[package]]
 name = "ai-common"
 version = "0.1.0"
-source = { git = "https://github.com/bgunyel/ai-common.git?rev=main#8773987e55ad36a8e76fa5894b517d3776a867ae" }
+source = { git = "https://github.com/bgunyel/ai-common.git?rev=main#1c77e8deb2ccb207e92d9bfcc3744a30416949d0" }
 dependencies = [
     { name = "langchain-anthropic" },
     { name = "langchain-core" },
@@ -228,7 +228,7 @@ wheels = [
 
 [[package]]
 name = "groq"
-version = "0.26.0"
+version = "0.27.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -238,9 +238,9 @@ dependencies = [
     { name = "sniffio" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b6/68/a820a22937e4a2f48b7a60e1aaf7948fb57d1c124072829b5cc06a01cfa0/groq-0.26.0.tar.gz", hash = "sha256:1f1e50d26c6134f6fb580ea7002e8f9ff5c7c1685c9e0f50d71adecd039ae5d4", size = 128500, upload_time = "2025-05-29T18:25:23.332Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6b/a5/bd3c4fdeea45f11f1a59f6a6bebad99cfa85db25617b296fa438f0744f68/groq-0.27.0.tar.gz", hash = "sha256:31098bbb7f9d05de7df1205ac36c0294dad2a0561f4ce26187edc0da32a511f0", size = 131304, upload_time = "2025-06-11T17:16:53.629Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/da/2e/14bef74aa760199c7a179c753953512d1aa1ed264f7477f6bd6fe9b9cff3/groq-0.26.0-py3-none-any.whl", hash = "sha256:4dc0900d506876ea39a9aa1985f12a51859bacf486fe939664248eff1f451af3", size = 129572, upload_time = "2025-05-29T18:25:22.077Z" },
+    { url = "https://files.pythonhosted.org/packages/89/63/83dfaefe4fc0b9d88c0d122b0ec4da3d968c8a9e465b0f9a325743bb41f6/groq-0.27.0-py3-none-any.whl", hash = "sha256:8175acbfd1beb73b009b7ed54ccec72654090b3a970fc9169a7b6098dd868766", size = 129930, upload_time = "2025-06-11T17:16:52.144Z" },
 ]
 
 [[package]]
