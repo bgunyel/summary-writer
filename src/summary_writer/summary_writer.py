@@ -33,7 +33,7 @@ class SummaryWriter(GraphBase):
                  llm_config: dict[str, Any],
                  web_search_api_key: str) -> None:
         self.models = list({llm_config['language_model'], llm_config['reasoning_model']})
-        self.configuration_module_prefix: Final = 'src.summary_writer.configuration'
+        self.configuration_module_prefix: Final = 'summary_writer.configuration'
         self.query_writer = QueryWriter(llm_server = llm_server,
                                         model_params = llm_config,
                                         configuration_module_prefix = self.configuration_module_prefix)
