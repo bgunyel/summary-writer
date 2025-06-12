@@ -4,7 +4,6 @@ from uuid import uuid4
 
 from config import settings
 from src.summary_writer import SummaryWriter
-from src.summary_writer.configuration import Configuration
 from ai_common import LlmServers, PRICE_USD_PER_MILLION_TOKENS
 
 

@@ -1,13 +1,12 @@
 import copy
-from typing import Any
+from typing import Any, Final
 
 from langchain_core.runnables import RunnableConfig
 from langchain_core.callbacks import get_usage_metadata_callback
-from ai_common import LlmServers, get_llm, strip_thinking_tokens
+from ai_common import LlmServers, get_llm, strip_thinking_tokens, get_config_from_runnable
 
 from ..enums import Node
 from ..state import SummaryState
-from ..configuration import Configuration
 
 
 WRITING_INSTRUCTIONS = """
@@ -86,14 +85,18 @@ Think carefully about the provided search results first. Then update the existin
 """
 
 class Writer:
-    def __init__(self, llm_server: LlmServers, model_params: dict[str, Any]):
+    def __init__(self, llm_server: LlmServers, model_params: dict[str, Any], configuration_module_prefix: str):
         self.model_name = model_params['reasoning_model']
+        self.configuration_module_prefix: Final = configuration_module_prefix
         model_params['model_name'] = self.model_name
         self.writer_llm = get_llm(llm_server=llm_server, model_params=model_params)
 
     def run(self, state: SummaryState, config: RunnableConfig) -> SummaryState:
 
-        configurable = Configuration.from_runnable(runnable=config)
+        configurable = get_config_from_runnable(
+            configuration_module_prefix = self.configuration_module_prefix,
+            config = config
+        )
 
         if state.summary_exists: # Extending existing summary
             instructions = EXTENDING_INSTRUCTIONS.format(topic=state.topic, summary=state.content, search_results=state.source_str)
