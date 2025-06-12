@@ -41,8 +41,9 @@ class SummaryWriter(GraphBase):
                                              model_params = llm_config,
                                              web_search_api_key = web_search_api_key,
                                              configuration_module_prefix = self.configuration_module_prefix)
-        # self.web_search = WebSearch(api_key = web_search_api_key)
-        self.writer = Writer(llm_server=llm_server, model_params=llm_config)
+        self.writer = Writer(llm_server=llm_server,
+                             model_params=llm_config,
+                             configuration_module_prefix=self.configuration_module_prefix)
         """
         self.summary_reviewer = SummaryReviewer(model_name=settings.REASONING_MODEL, context_window_length=config.context_window_length)
         """
