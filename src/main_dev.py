@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import time
 from uuid import uuid4
@@ -78,8 +79,10 @@ def main():
                                    llm_config = llm_config[llm_server.value],
                                    web_search_api_key = settings.TAVILY_API_KEY)
 
+    event_loop = asyncio.get_event_loop()
+    out_dict = event_loop.run_until_complete(summary_writer.run(topic=topic, config=config))
 
-    out_dict = summary_writer.run(topic=topic, config=config)
+    # out_dict = summary_writer.run(topic=topic, config=config)
 
     price_dict = {k:PRICE_USD_PER_MILLION_TOKENS[llm_server.value][k] for k in out_dict['token_usage'].keys()}
     total_cost = sum([price_dict[k][p] * out_dict['token_usage'][k][p] for k in price_dict.keys() for p in price_dict[k].keys()]) / 1e6

@@ -49,7 +49,7 @@ class SummaryWriter(GraphBase):
         """
         self.graph = self.build_graph()
 
-    def run(self, topic: str, config: RunnableConfig) -> dict[str, Any]:
+    async def run(self, topic: str, config: RunnableConfig) -> dict[str, Any]:
         in_state = SummaryState(
             content='',
             iteration=0,
@@ -61,7 +61,7 @@ class SummaryWriter(GraphBase):
             topic=topic,
             unique_sources={},
         )
-        out_state = self.graph.invoke(in_state, config)
+        out_state = await self.graph.ainvoke(in_state, config)
         out_dict = {
             'content': out_state['content'],
             'unique_sources': out_state['unique_sources'],

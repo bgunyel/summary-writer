@@ -228,7 +228,7 @@ wheels = [
 
 [[package]]
 name = "groq"
-version = "0.27.0"
+version = "0.28.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -238,9 +238,9 @@ dependencies = [
     { name = "sniffio" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6b/a5/bd3c4fdeea45f11f1a59f6a6bebad99cfa85db25617b296fa438f0744f68/groq-0.27.0.tar.gz", hash = "sha256:31098bbb7f9d05de7df1205ac36c0294dad2a0561f4ce26187edc0da32a511f0", size = 131304, upload_time = "2025-06-11T17:16:53.629Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d0/7d/bb053ba75357bf5e8c33def63fb31c8b0bb86dce07759a0cd8e3232d2df9/groq-0.28.0.tar.gz", hash = "sha256:65e1cab9184cbb32380d62eca50d6162269c7ec0c77e4cc868069cfe93450f9f", size = 131730, upload_time = "2025-06-12T16:22:49.17Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/89/63/83dfaefe4fc0b9d88c0d122b0ec4da3d968c8a9e465b0f9a325743bb41f6/groq-0.27.0-py3-none-any.whl", hash = "sha256:8175acbfd1beb73b009b7ed54ccec72654090b3a970fc9169a7b6098dd868766", size = 129930, upload_time = "2025-06-11T17:16:52.144Z" },
+    { url = "https://files.pythonhosted.org/packages/ac/24/20fc18d1b3e0883aeb24286ca8f26dc1970561b07d9c4412c84561bdf307/groq-0.28.0-py3-none-any.whl", hash = "sha256:c6f86638371c2cba2ca337232e76c8d412e75965ed7e3058d30c9aa5dfe84303", size = 130217, upload_time = "2025-06-12T16:22:47.97Z" },
 ]
 
 [[package]]
