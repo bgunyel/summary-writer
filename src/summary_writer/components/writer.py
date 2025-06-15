@@ -104,7 +104,7 @@ class Writer:
             instructions = WRITING_INSTRUCTIONS.format(topic=state.topic, context=state.source_str)
 
         with get_usage_metadata_callback() as cb:
-            summary = self.writer_llm.invoke(instructions)
+            summary = self.writer_llm.invoke(instructions, service_tier="auto") # TODO: For Groq only
             state.token_usage[self.model_name]['input_tokens'] += cb.usage_metadata[self.model_name]['input_tokens']
             state.token_usage[self.model_name]['output_tokens'] += cb.usage_metadata[self.model_name]['output_tokens']
             state.steps.append(Node.WRITER.value)
