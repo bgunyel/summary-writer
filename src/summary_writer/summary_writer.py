@@ -28,21 +28,15 @@ class SummaryWriter(GraphBase):
     Reproduction from https://github.com/langchain-ai/ollama-deep-researcher
     """
 
-    def __init__(self,
-                 llm_server: LlmServers,
-                 llm_config: dict[str, Any],
-                 web_search_api_key: str) -> None:
-        self.models = list({llm_config['language_model'], llm_config['reasoning_model']})
+    def __init__(self, llm_config: dict[str, Any], web_search_api_key: str) -> None:
+        self.models = list({llm_config['language_model']['model'], llm_config['reasoning_model']['model']})
         self.configuration_module_prefix: Final = 'summary_writer.configuration'
-        self.query_writer = QueryWriter(llm_server = llm_server,
-                                        model_params = llm_config,
+        self.query_writer = QueryWriter(model_params = llm_config['language_model'],
                                         configuration_module_prefix = self.configuration_module_prefix)
-        self.web_search_node = WebSearchNode(llm_server = llm_server,
-                                             model_params = llm_config,
+        self.web_search_node = WebSearchNode(model_params = llm_config['language_model'],
                                              web_search_api_key = web_search_api_key,
                                              configuration_module_prefix = self.configuration_module_prefix)
-        self.writer = Writer(llm_server=llm_server,
-                             model_params=llm_config,
+        self.writer = Writer(model_params=llm_config['reasoning_model'],
                              configuration_module_prefix=self.configuration_module_prefix)
         """
         self.summary_reviewer = SummaryReviewer(model_name=settings.REASONING_MODEL, context_window_length=config.context_window_length)

@@ -10,52 +10,41 @@ from ai_common import LlmServers, PRICE_USD_PER_MILLION_TOKENS
 
 def main():
 
-    llm_server = LlmServers.GROQ
-
     llm_config = {
-        LlmServers.GROQ.value: {
-            'model_name': None,
-            'groq_api_key': settings.GROQ_API_KEY,
-            'language_model': 'llama-3.3-70b-versatile',
-            'reasoning_model': 'deepseek-r1-distill-llama-70b',
-        },
-        LlmServers.OPENAI.value: {
-            'model_name': None,
-            'openai_api_key': settings.OPENAI_API_KEY,
-            'language_model': 'gpt-4.1-2025-04-14',
-            'reasoning_model': 'o3',
-        },
-        LlmServers.VLLM.value: {
-            'llm_base_url': None,
-            'vllm_api_key': None
-        },
-        LlmServers.OLLAMA.value: {
-            'model_name': None,
-            'llm_base_url': None,
-            'format': None,  # Literal['', 'json']
-            'context_window_length': None,
+        'language_model': {
+            'model': 'llama-3.3-70b-versatile',
+            'model_provider': LlmServers.GROQ.value,
+            'api_key': settings.GROQ_API_KEY,
+            'model_args': {
+                'temperature': 0,
+                'max_retries': 5,
+                'max_tokens': 32768,
+                'model_kwargs': {
+                    'top_p': 0.95,
+                    'service_tier': "auto",
+                    }
+                }
+            },
+        'reasoning_model': {
+            'model': 'deepseek-r1-distill-llama-70b',
+            'model_provider': LlmServers.GROQ.value,
+            'api_key': settings.GROQ_API_KEY,
+            'model_args': {
+                'temperature': 0,
+                'max_retries': 5,
+                'max_tokens': 32768,
+                'model_kwargs': {
+                    'top_p': 0.95,
+                    'service_tier': "auto",
+                    }
+                }
+            }
         }
-    }
 
-    language_model = llm_config[llm_server.value].get('language_model', '')
-    reasoning_model = llm_config[llm_server.value].get('reasoning_model', '')
-
-    """
-    engine = Engine(
-        responder=SummaryWriter(
-            llm_server = llm_server,
-            llm_config = llm_config[llm_server.value],
-            web_search_api_key = settings.TAVILY_API_KEY
-        ),
-        llm_server=llm_server,
-        models=[language_model, reasoning_model],
-        llm_base_url=llm_config[llm_server.value].get('llm_base_url', ''),
-        save_to_folder=settings.OUT_FOLDER
-    )
-    """
+    language_model = llm_config['language_model'].get('model', '')
+    reasoning_model = llm_config['reasoning_model'].get('model', '')
 
     topic = 'first 100 days of Trump administration'
-    print(f'LLM Server: {llm_server.value}')
     print(f'Language Model: {language_model}')
     print(f'Reasoning Model: {reasoning_model}')
     print('\n')
@@ -75,17 +64,21 @@ def main():
             }
         }
 
-    summary_writer = SummaryWriter(llm_server = llm_server,
-                                   llm_config = llm_config[llm_server.value],
-                                   web_search_api_key = settings.TAVILY_API_KEY)
+    summary_writer = SummaryWriter(llm_config = llm_config, web_search_api_key = settings.TAVILY_API_KEY)
 
     event_loop = asyncio.get_event_loop()
     out_dict = event_loop.run_until_complete(summary_writer.run(topic=topic, config=config))
 
     # out_dict = summary_writer.run(topic=topic, config=config)
 
-    price_dict = {k:PRICE_USD_PER_MILLION_TOKENS[llm_server.value][k] for k in out_dict['token_usage'].keys()}
-    total_cost = sum([price_dict[k][p] * out_dict['token_usage'][k][p] for k in price_dict.keys() for p in price_dict[k].keys()]) / 1e6
+    total_cost = 0
+    for model_type, params in llm_config.items():
+        model_provider = params['model_provider']
+        model = params['model']
+        price_dict = PRICE_USD_PER_MILLION_TOKENS[model_provider][model]
+        cost = sum([price_dict[k] * out_dict['token_usage'][model][k] for k in price_dict.keys()]) / 1e6
+        total_cost += cost
+        print(f'Cost for {model_provider}: {model} --> {cost:.4f} USD')
     print(f'Total Token Usage Cost: {total_cost:.4f} USD')
 
     dummy = -32

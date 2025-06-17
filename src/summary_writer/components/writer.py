@@ -3,7 +3,8 @@ from typing import Any, Final
 
 from langchain_core.runnables import RunnableConfig
 from langchain_core.callbacks import get_usage_metadata_callback
-from ai_common import LlmServers, get_llm, strip_thinking_tokens, get_config_from_runnable
+from langchain.chat_models import init_chat_model
+from ai_common import strip_thinking_tokens, get_config_from_runnable
 
 from ..enums import Node
 from ..state import SummaryState
@@ -85,11 +86,14 @@ Think carefully about the provided search results first. Then update the existin
 """
 
 class Writer:
-    def __init__(self, llm_server: LlmServers, model_params: dict[str, Any], configuration_module_prefix: str):
-        self.model_name = model_params['reasoning_model']
+    def __init__(self, model_params: dict[str, Any], configuration_module_prefix: str):
+        self.model_name = model_params['model']
         self.configuration_module_prefix: Final = configuration_module_prefix
-        model_params['model_name'] = self.model_name
-        self.writer_llm = get_llm(llm_server=llm_server, model_params=model_params)
+        self.writer_llm = init_chat_model(
+            model=model_params['model'],
+            model_provider=model_params['model_provider'],
+            api_key=model_params['api_key'],
+            **model_params['model_args'])
 
     def run(self, state: SummaryState, config: RunnableConfig) -> SummaryState:
 
@@ -104,7 +108,7 @@ class Writer:
             instructions = WRITING_INSTRUCTIONS.format(topic=state.topic, context=state.source_str)
 
         with get_usage_metadata_callback() as cb:
-            summary = self.writer_llm.invoke(instructions, service_tier="auto") # TODO: For Groq only
+            summary = self.writer_llm.invoke(instructions) # TODO: For Groq only
             state.token_usage[self.model_name]['input_tokens'] += cb.usage_metadata[self.model_name]['input_tokens']
             state.token_usage[self.model_name]['output_tokens'] += cb.usage_metadata[self.model_name]['output_tokens']
             state.steps.append(Node.WRITER.value)

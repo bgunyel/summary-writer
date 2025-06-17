@@ -10,6 +10,7 @@ class Configuration(CfgBase):
     """The configurable fields for the workflow"""
     # thread_id: str
     max_iterations: int
+    # max_retries: int # in case LLM call fails, the number of retries
     max_results_per_query: int
     max_tokens_per_source: int
     number_of_days_back: int = None
