@@ -7,6 +7,9 @@ __pycache__/
 .venv/
 .python-version
 
+# Coding Assistants Related
+.claude/
+
 # Input/Output folders
 input/
 out/
