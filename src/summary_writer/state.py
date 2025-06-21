@@ -25,3 +25,5 @@ class SummaryState(BaseModel):
     token_usage: dict
     topic: str
     unique_sources: dict[str, Any]
+    cumulative_unique_sources: list[dict[str, Any]]
+    cumulative_search_queries: list

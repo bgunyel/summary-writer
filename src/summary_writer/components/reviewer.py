@@ -1,10 +1,12 @@
+import datetime
 from typing import Any, Final
+import json
 
 from pydantic import BaseModel
 from langchain_core.runnables import RunnableConfig
 from langchain_core.callbacks import get_usage_metadata_callback
 from langchain.chat_models import init_chat_model
-from ai_common import strip_thinking_tokens, get_config_from_runnable
+from ai_common import get_config_from_runnable, SearchQuery
 
 from ..enums import Node
 from ..state import SummaryState
@@ -88,7 +90,20 @@ class Reviewer:
             config=config
         )
 
+        state.steps.append(Node.REVIEWER)
+        state.cumulative_unique_sources.append(state.unique_sources)
+        state.cumulative_search_queries.append(state.search_queries)
+        state.iteration += 1
 
+        instructions = REVIEW_INSTRUCTIONS.format(topic=state.topic,
+                                                  context=state.content,
+                                                  today=datetime.date.today().isoformat())
 
-        state.steps.append(Node.REVIEWER.value)
+        with get_usage_metadata_callback() as cb:
+            results = self.base_llm.invoke(instructions, response_format = {"type": "json_object"})
+            state.token_usage[self.model_name]['input_tokens'] += cb.usage_metadata[self.model_name]['input_tokens']
+            state.token_usage[self.model_name]['output_tokens'] += cb.usage_metadata[self.model_name]['output_tokens']
+            json_dict = json.loads(results.content)
+            state.search_queries = [SearchQuery(search_query=q['query']) for q in json_dict['queries']]
+
         return state

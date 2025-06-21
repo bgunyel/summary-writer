@@ -17,8 +17,8 @@ from .components import Writer, Reviewer
 def route_research(state: SummaryState, config: RunnableConfig) -> Literal["continue_research", "end_research"]:
     """ Route the research based on the follow-up query """
 
-    configurable = Configuration.from_runnable_config(config=config)
-    if state.iteration <= configurable.max_iterations:
+    configurable = Configuration.from_runnable(runnable=config)
+    if state.iteration < configurable.max_iterations:
         return "continue_research"
     else:
         return "end_research"
@@ -56,11 +56,13 @@ class SummaryWriter(GraphBase):
             token_usage={m: {'input_tokens': 0, 'output_tokens': 0} for m in self.models},
             topic=topic,
             unique_sources={},
+            cumulative_unique_sources=[],
+            cumulative_search_queries=[],
         )
         out_state = await self.graph.ainvoke(in_state, config)
         out_dict = {
             'content': out_state['content'],
-            'unique_sources': out_state['unique_sources'],
+            'unique_sources': {k: v for d in out_state['cumulative_unique_sources'] for k, v in d.items()},
             'token_usage': out_state['token_usage'],
         }
         return out_dict
@@ -97,18 +99,17 @@ class SummaryWriter(GraphBase):
         workflow.add_edge(start_key=Node.QUERY_WRITER, end_key=Node.WEB_SEARCH)
         workflow.add_edge(start_key=Node.WEB_SEARCH, end_key=Node.WRITER)
         workflow.add_edge(start_key=Node.WRITER, end_key=Node.REVIEWER)
-        workflow.add_edge(start_key=Node.REVIEWER, end_key=END)
+        # workflow.add_edge(start_key=Node.REVIEWER, end_key=END)
 
-        """
         workflow.add_conditional_edges(
-            source=Node.SUMMARY_REVIEWER.value,
+            source=Node.REVIEWER,
             path=route_research,
             path_map={
-                'continue_research': Node.WEB_SEARCH.value,
+                'continue_research': Node.WEB_SEARCH,
                 'end_research': END,
             }
         )
-        """
+
 
         ## Compile Graph
         compiled_graph = workflow.compile(checkpointer=self.memory_saver)

@@ -112,7 +112,7 @@ class Writer:
             summary = self.writer_llm.invoke(instructions)
             state.token_usage[self.model_name]['input_tokens'] += cb.usage_metadata[self.model_name]['input_tokens']
             state.token_usage[self.model_name]['output_tokens'] += cb.usage_metadata[self.model_name]['output_tokens']
-            state.steps.append(Node.WRITER.value)
+            state.steps.append(Node.WRITER)
             state.summary_exists = True
             state.content = copy.deepcopy(summary.content)
 
