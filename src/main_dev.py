@@ -44,7 +44,7 @@ def main():
     language_model = llm_config['language_model'].get('model', '')
     reasoning_model = llm_config['reasoning_model'].get('model', '')
 
-    topic = 'first 100 days of Trump administration'
+    topic = 'Life and Philosophy of Marcus Aurelius'
     print(f'Language Model: {language_model}')
     print(f'Reasoning Model: {reasoning_model}')
     print('\n')
@@ -66,8 +66,9 @@ def main():
 
     summary_writer = SummaryWriter(llm_config = llm_config, web_search_api_key = settings.TAVILY_API_KEY)
 
-    event_loop = asyncio.get_event_loop()
+    event_loop = asyncio.new_event_loop()
     out_dict = event_loop.run_until_complete(summary_writer.run(topic=topic, config=config))
+    event_loop.close()
 
     # out_dict = summary_writer.run(topic=topic, config=config)
 
@@ -80,6 +81,8 @@ def main():
         total_cost += cost
         print(f'Cost for {model_provider}: {model} --> {cost:.4f} USD')
     print(f'Total Token Usage Cost: {total_cost:.4f} USD')
+    print('\n\n\n')
+    print(out_dict['content'])
 
     dummy = -32
 
