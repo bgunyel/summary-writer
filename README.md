@@ -4,11 +4,12 @@ An AI-powered research tool that automatically generates comprehensive summaries
 
 ## Overview
 
-Summary Writer uses a multi-step workflow to research topics and create high-quality summaries:
+Summary Writer uses a sophisticated iterative workflow to research topics and create high-quality summaries:
 
 1. **Query Generation** - Creates targeted web search queries for comprehensive coverage
 2. **Web Search** - Searches the internet using Tavily API for relevant, up-to-date information  
 3. **Summary Writing** - Synthesizes search results into coherent summaries using reasoning models
+4. **Review & Iteration** - Analyzes summaries for knowledge gaps and generates follow-up research queries
 
 ## Features
 
@@ -16,8 +17,9 @@ Summary Writer uses a multi-step workflow to research topics and create high-qua
 - **Intelligent Query Generation**: Automatically creates diverse search queries to cover all aspects of a topic
 - **Web Search Integration**: Uses Tavily API for comprehensive web search capabilities
 - **Advanced Reasoning**: Leverages reasoning models for high-quality summary generation
+- **Iterative Research**: Automatic knowledge gap identification and follow-up research
 - **Configurable Workflow**: Customizable research iterations and query parameters
-- **LangGraph Orchestration**: Uses LangGraph for robust workflow management
+- **LangGraph Orchestration**: Uses LangGraph for robust workflow management with conditional routing
 
 ## Installation
 
@@ -145,7 +147,8 @@ src/
 │   ├── enums.py              # Enums and constants
 │   └── components/
 │       ├── __init__.py        # Component exports
-│       └── writer.py          # Creates summaries from search results
+│       ├── writer.py          # Creates summaries from search results
+│       └── reviewer.py        # Analyzes summaries and identifies knowledge gaps
 ├── main_dev.py               # Development entry point
 └── config.py                 # Application configuration
 ```
@@ -173,16 +176,23 @@ The Summary Writer follows a sophisticated multi-step process:
 - Filters and processes content for relevance
 - Tracks unique sources to avoid duplication
 
-### 3. Iterative Research
-- Performs multiple research iterations for thorough coverage
-- Routes between continued research and summary generation
-- Maintains state across iterations for consistency
-
-### 4. Summary Generation
+### 3. Summary Generation
 - Uses reasoning models for high-quality synthesis
 - Combines information from all gathered sources
 - Produces coherent, comprehensive summaries
-- Tracks token usage and costs
+- Handles both initial summary creation and iterative enhancement
+
+### 4. Review & Knowledge Gap Analysis
+- Analyzes generated summaries for completeness and depth
+- Identifies missing information and areas needing clarification
+- Generates targeted follow-up questions for additional research
+- Creates new search queries to address knowledge gaps
+
+### 5. Iterative Research Loop
+- Performs multiple research iterations for thorough coverage
+- Uses conditional routing to decide between continued research and completion
+- Maintains cumulative state across iterations for consistency
+- Tracks token usage and costs across all iterations
 
 ## State Management
 
@@ -194,8 +204,11 @@ The workflow maintains a comprehensive state object (`SummaryState`) that includ
 - **content**: Generated summary content
 - **steps**: Workflow steps executed
 - **token_usage**: Detailed token consumption tracking
-- **unique_sources**: De-duplicated source tracking
+- **unique_sources**: De-duplicated source tracking for current iteration
+- **cumulative_unique_sources**: All sources collected across iterations
+- **cumulative_search_queries**: All search queries executed across iterations
 - **iteration**: Current research iteration count
+- **summary_exists**: Flag indicating if initial summary has been created
 
 ## Cost Tracking
 
@@ -211,6 +224,35 @@ The system provides detailed cost analysis:
 - Graceful handling of search API failures
 - State preservation across component failures
 - Comprehensive logging and debugging support
+
+## Advanced Features
+
+### Conditional Workflow Routing
+The system uses intelligent routing to determine when to continue research or complete the summary:
+- **Continue Research**: When iteration count is below max_iterations threshold
+- **End Research**: When maximum iterations reached or research goals satisfied
+- Maintains conversation memory across iterations using LangGraph checkpointing
+
+### JSON-Structured Analysis
+The Reviewer component provides structured analysis using JSON format:
+```json
+{
+    "reasoning": "Analysis of current summary completeness",
+    "knowledge_gap": "Specific areas requiring additional information",
+    "follow-up questions": [
+        {"question": "Targeted research question"}
+    ],
+    "queries": [
+        {"query": "Stand-alone web search query"}
+    ]
+}
+```
+
+### Summary Enhancement
+The Writer component supports two modes:
+- **Initial Summary**: Creates new summary from search results
+- **Enhancement Mode**: Extends existing summary with new research findings
+- Automatic thinking token removal for clean output
 
 ## License
 
