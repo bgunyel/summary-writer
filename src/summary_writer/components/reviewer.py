@@ -144,8 +144,6 @@ class Reviewer:
         )
 
         state.steps.append(Node.REVIEWER)
-        state.cumulative_unique_sources.append(state.unique_sources)
-        state.cumulative_search_queries.append(state.search_queries)
         state.iteration += 1
 
         instructions = REVIEW_INSTRUCTIONS.format(topic=state.topic,

@@ -40,7 +40,10 @@ class SummaryWriter(GraphBase):
                                              web_search_api_key = web_search_api_key,
                                              configuration_module_prefix = self.configuration_module_prefix)
         self.writer = Writer(model_params=llm_config['reasoning_model'],
-                             configuration_module_prefix=self.configuration_module_prefix)
+                             configuration_module_prefix=self.configuration_module_prefix,
+                             enable_citations = True,
+                             citation_style = "numeric",
+                             min_confidence = 0.6)
         self.reviewer = Reviewer(model_params=llm_config['reasoning_model'],
                                  configuration_module_prefix=self.configuration_module_prefix)
         self.graph = self.build_graph()
@@ -58,6 +61,9 @@ class SummaryWriter(GraphBase):
             unique_sources={},
             cumulative_unique_sources=[],
             cumulative_search_queries=[],
+            bibliography='',
+            cited_content='',
+            claims=[],
         )
         out_state = await self.graph.ainvoke(in_state, config)
         out_dict = {

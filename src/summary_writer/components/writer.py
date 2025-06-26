@@ -1,5 +1,5 @@
 import copy
-from typing import Any, Final
+from typing import Any
 
 from langchain_core.runnables import RunnableConfig
 from langchain_core.callbacks import get_usage_metadata_callback
@@ -8,6 +8,7 @@ from ai_common import strip_thinking_tokens, get_config_from_runnable
 
 from ..enums import Node
 from ..state import SummaryState
+from .writer_with_citations import WriterWithCitations
 
 
 WRITING_INSTRUCTIONS = """
@@ -85,78 +86,71 @@ Think carefully about the provided search results first. Then update the existin
 </Task>
 """
 
-class Writer:
-    def __init__(self, model_params: dict[str, Any], configuration_module_prefix: str):
-        self.model_name = model_params['model']
-        self.configuration_module_prefix: Final = configuration_module_prefix
-        self.writer_llm = init_chat_model(
-            model=model_params['model'],
-            model_provider=model_params['model_provider'],
-            api_key=model_params['api_key'],
-            **model_params['model_args']
-        )
+# Backward compatibility wrapper
+class Writer(WriterWithCitations):
+    """
+    Backward compatible Writer class.
+
+    If you want to maintain the original behavior, set enable_citations=False.
+    If you want citations, set enable_citations=True.
+    """
+
+    def __init__(self, model_params: dict[str, Any], configuration_module_prefix: str,
+                 enable_citations: bool = True, citation_style: str = "numeric",
+                 min_confidence: float = 0.6):
+
+        if enable_citations:
+            super().__init__(model_params, configuration_module_prefix, citation_style, min_confidence)
+        else:
+            # Original behavior
+            self.model_name = model_params['model']
+            self.configuration_module_prefix = configuration_module_prefix
+            self.writer_llm = init_chat_model(
+                model=model_params['model'],
+                model_provider=model_params['model_provider'],
+                api_key=model_params['api_key'],
+                **model_params['model_args']
+            )
+
+        self.enable_citations = enable_citations
 
     def run(self, state: SummaryState, config: RunnableConfig) -> SummaryState:
-        """
-        Execute the writing process to generate or extend a summary based on the current state.
-        
-        This method determines whether to create a new summary or extend an existing one based on
-        the state.summary_exists flag. It uses different instruction templates depending on the
-        operation type and tracks token usage throughout the process.
-        
-        Args:
-            state (SummaryState): The current state containing:
-                - topic: The subject matter for the summary
-                - summary_exists: Boolean flag indicating if extending existing summary
-                - content: Current summary content (if extending)
-                - source_str: Context or search results to use for writing/extending
-                - token_usage: Dictionary tracking token consumption by model
-                - steps: List tracking the workflow steps completed
-            config (RunnableConfig): Configuration object containing runnable parameters
-                and configurable options for the writing process
-        
-        Returns:
-            SummaryState: Updated state object with:
-                - content: The newly generated or extended summary text
-                - summary_exists: Set to True after successful writing
-                - token_usage: Updated with tokens consumed during this operation
-                - steps: Appended with Node.WRITER to track completion
-        
-        Process Flow:
-            1. Extracts configuration parameters from the runnable config
-            2. Selects appropriate instruction template (extending vs. new summary)
-            3. Invokes the LLM with formatted instructions
-            4. Captures and records token usage metadata
-            5. Updates state with generated content and process tracking
-            6. Optionally strips thinking tokens if configured
-            7. Cleans up leading whitespace from the final content
-        
-        Side Effects:
-            - Modifies the input state object in place
-            - Records token usage for the configured model
-            - Adds WRITER node to the steps tracking list
-        """
 
-        configurable = get_config_from_runnable(
-            configuration_module_prefix = self.configuration_module_prefix,
-            config = config
-        )
+        state.cumulative_unique_sources.append(state.unique_sources)
+        state.cumulative_search_queries.append(state.search_queries)
 
-        if state.summary_exists: # Extending existing summary
-            instructions = EXTENDING_INSTRUCTIONS.format(topic=state.topic, summary=state.content, search_results=state.source_str)
-        else: # Writing a new summary
-            instructions = WRITING_INSTRUCTIONS.format(topic=state.topic, context=state.source_str)
+        if self.enable_citations:
+            return super().run(state, config)
+        else:
+            # Original implementation
+            configurable = get_config_from_runnable(
+                configuration_module_prefix=self.configuration_module_prefix,
+                config=config
+            )
 
-        with get_usage_metadata_callback() as cb:
-            summary = self.writer_llm.invoke(instructions)
-            state.token_usage[self.model_name]['input_tokens'] += cb.usage_metadata[self.model_name]['input_tokens']
-            state.token_usage[self.model_name]['output_tokens'] += cb.usage_metadata[self.model_name]['output_tokens']
-            state.steps.append(Node.WRITER)
-            state.summary_exists = True
-            state.content = copy.deepcopy(summary.content)
+            if state.summary_exists:
+                instructions = EXTENDING_INSTRUCTIONS.format(
+                    topic=state.topic,
+                    summary=state.content,
+                    search_results=state.source_str
+                )
+            else:
+                instructions = WRITING_INSTRUCTIONS.format(
+                    topic=state.topic,
+                    context=state.source_str
+                )
 
-        if configurable.strip_thinking_tokens:
-            state.content = strip_thinking_tokens(text=state.content)
+            with get_usage_metadata_callback() as cb:
+                summary = self.writer_llm.invoke(instructions)
+                state.token_usage[self.model_name]['input_tokens'] += cb.usage_metadata[self.model_name]['input_tokens']
+                state.token_usage[self.model_name]['output_tokens'] += cb.usage_metadata[self.model_name][
+                    'output_tokens']
+                state.steps.append(Node.WRITER)
+                state.summary_exists = True
+                state.content = copy.deepcopy(summary.content)
 
-        state.content = state.content.lstrip('\n')
-        return state
+            if configurable.strip_thinking_tokens:
+                state.content = strip_thinking_tokens(text=state.content)
+
+            state.content = state.content.lstrip('\n')
+            return state

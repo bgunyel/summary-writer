@@ -1,7 +1,17 @@
-from typing import Any
+from typing import Any, List
+from dataclasses import dataclass
 
 from pydantic import BaseModel
 from ai_common import SearchQuery
+
+@dataclass
+class WriterClaim:
+    """Represents a claim extracted by the Writer"""
+    text: str
+    source_ids: List[str]
+    confidence: float
+    start_position: int = 0
+    end_position: int = 0
 
 
 class SummaryState(BaseModel):
@@ -27,3 +37,7 @@ class SummaryState(BaseModel):
     unique_sources: dict[str, Any]
     cumulative_unique_sources: list[dict[str, Any]]
     cumulative_search_queries: list
+
+    bibliography: str # reference list
+    cited_content: str # summary with inline citations
+    claims: List[WriterClaim] # for tracking claims

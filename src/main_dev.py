@@ -82,7 +82,6 @@ def main():
         print(f'Cost for {model_provider}: {model} --> {cost:.4f} USD')
     print(f'Total Token Usage Cost: {total_cost:.4f} USD')
     print('\n\n\n')
-    print(out_dict['content'])
 
     dummy = -32
 
