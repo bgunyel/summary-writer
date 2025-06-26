@@ -41,7 +41,7 @@ class SummaryWriter(GraphBase):
                                              configuration_module_prefix = self.configuration_module_prefix)
         self.writer = Writer(model_params=llm_config['reasoning_model'],
                              configuration_module_prefix=self.configuration_module_prefix,
-                             enable_citations = True,
+                             enable_citations = False,
                              citation_style = "numeric",
                              min_confidence = 0.6)
         self.reviewer = Reviewer(model_params=llm_config['reasoning_model'],
