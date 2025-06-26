@@ -26,7 +26,7 @@ def main():
                 }
             },
         'reasoning_model': {
-            'model': 'deepseek-r1-distill-llama-70b',
+            'model': 'qwen/qwen3-32b', #'deepseek-r1-distill-llama-70b',
             'model_provider': LlmServers.GROQ.value,
             'api_key': settings.GROQ_API_KEY,
             'model_args': {

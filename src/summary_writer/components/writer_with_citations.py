@@ -37,10 +37,34 @@ The context you are going to use (with source IDs):
 5. CRITICAL: Mark every factual claim with proper source attribution.
 </Requirements>
 
-<Citation Instructions>
-For every factual statement that requires attribution, use this exact format:
-<CLAIM sources="source_id1,source_id2" confidence="0.0-1.0">"your factual claim here"</CLAIM>
+<Format>
+* Format your response as a JSON object with two fields:
+    - summary: The summary that is generated about the topic using the given context. Start directly with the summary, without preamble or titles.
+    - claims: Claims in your summary.
+* Each claim should have the following five fileds:
+    - text: Text of the claim taken from the summary.
+    - source_ids: The ids of sources that support your claim (e.g. src1, src2, etc.).
+    - confidence: Your confidence level in your claim (between 0 and 1, floating point)
+    - start_position: The start position of your claim in the generated summary.
+    - end_position: The end position of your claim in the generated summary.
 
+Provide your analysis in JSON format:
+
+{{
+    "summary": "string",
+    "claims": [
+            {{
+                "text": str
+                "source_ids": List[str]
+                "confidence": str
+                "start_position": str
+                "end_position": str
+            }}
+    ],    
+}}
+</Format>
+
+<Claim Instructions>
 WHAT TO MARK AS CLAIMS:
 ✓ Statistics, numbers, percentages, measurements
 ✓ Specific facts, dates, events, names
@@ -61,25 +85,39 @@ CONFIDENCE LEVELS:
 - 0.6: Somewhat supported but requires interpretation
 - Below 0.6: Don't include the claim
 
-VERY IMPORTANT:
-* Every claim must exactly follow the required format
-* Every claim must have:
-    + opening tag: "<CLAIM"
-    + sources: "source_id1,source_id2"
-    + confidence: "0.0-1.0"
-    + your factual claim
-    + closing tag: "</CLAIM>"
-
 EXAMPLE:
-The renewable energy sector experienced significant growth in 2024. <CLAIM sources="src1" confidence="0.95">Solar energy capacity increased by 23% globally</CLAIM>, while <CLAIM sources="src2" confidence="0.88">wind energy installations grew by 18%</CLAIM>. This expansion was driven by <CLAIM sources="src1,src2" confidence="0.80">increased government subsidies totaling $12 billion</CLAIM>.
-</Citation Instructions>
-
-<Formatting>
-- Start directly with the summary, without preamble or titles. 
-</Formatting>
+{{
+    "summary": "The renewable energy sector experienced significant growth in 2024. Solar energy capacity increased by 23% globally, while wind energy installations grew by 18%. This expansion was driven by increased government subsidies totaling $12 billion.",
+    "claims": [
+            {{
+                "text": "Solar energy capacity increased by 23% globally"
+                "source_ids": [src1]
+                "confidence": 0.95
+                "start_position": 68
+                "end_position": 115
+            }},
+            {{
+                "text": "wind energy installations grew by 18%"
+                "source_ids": [src2]
+                "confidence": 0.88
+                "start_position": 123
+                "end_position": 160
+            }},
+            {{
+                "text": "increased government subsidies totaling $12 billion"
+                "source_ids": List[src1, src2]
+                "confidence": 0.80
+                "start_position": 191
+                "end_position": 242
+            }}
+    ],    
+}}
+</Claim Instructions>
 
 <Task>
-Think carefully about the provided context first. Then write a comprehensive summary using the provided context, marking every factual claim with proper source attribution.
+Think carefully about the provided context first. 
+Then write a comprehensive summary using the provided context. 
+List every factual claim with proper source attribution, confidence, start position, end position.
 </Task>
 """
 

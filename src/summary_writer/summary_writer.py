@@ -11,7 +11,7 @@ from ai_common.components import QueryWriter, WebSearchNode
 from .state import SummaryState
 from .enums import Node
 from .configuration import Configuration
-from .components import Writer, Reviewer
+from .components import Writer, Reviewer, CitationsManager
 
 
 def route_research(state: SummaryState, config: RunnableConfig) -> Literal["continue_research", "end_research"]:
@@ -44,6 +44,8 @@ class SummaryWriter(GraphBase):
                              enable_citations = False,
                              citation_style = "numeric",
                              min_confidence = 0.6)
+        self.citations_manager = CitationsManager(model_params=llm_config['reasoning_model'],
+                                                  configuration_module_prefix=self.configuration_module_prefix)
         self.reviewer = Reviewer(model_params=llm_config['reasoning_model'],
                                  configuration_module_prefix=self.configuration_module_prefix)
         self.graph = self.build_graph()
@@ -98,14 +100,15 @@ class SummaryWriter(GraphBase):
         workflow.add_node(node=Node.QUERY_WRITER, action=self.query_writer.run)
         workflow.add_node(node=Node.WEB_SEARCH, action=self.web_search_node.run)
         workflow.add_node(node=Node.WRITER, action=self.writer.run)
+        workflow.add_node(node=Node.CITATIONS_MANAGER, action=self.citations_manager.run)
         workflow.add_node(node=Node.REVIEWER, action=self.reviewer.run)
 
         ## Edges
         workflow.add_edge(start_key=START, end_key=Node.QUERY_WRITER)
         workflow.add_edge(start_key=Node.QUERY_WRITER, end_key=Node.WEB_SEARCH)
         workflow.add_edge(start_key=Node.WEB_SEARCH, end_key=Node.WRITER)
-        workflow.add_edge(start_key=Node.WRITER, end_key=Node.REVIEWER)
-        # workflow.add_edge(start_key=Node.REVIEWER, end_key=END)
+        workflow.add_edge(start_key=Node.WRITER, end_key=Node.CITATIONS_MANAGER)
+        workflow.add_edge(start_key=Node.CITATIONS_MANAGER, end_key=Node.REVIEWER)
 
         workflow.add_conditional_edges(
             source=Node.REVIEWER,

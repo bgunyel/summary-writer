@@ -8,3 +8,4 @@ class Node(NodeBase):
     # Class attributes
     REVIEWER: ClassVar[str] = 'reviewer'
     WRITER: ClassVar[str] = 'writer'
+    CITATIONS_MANAGER: ClassVar[str] = 'citations_manager'
