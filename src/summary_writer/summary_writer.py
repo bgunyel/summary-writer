@@ -41,7 +41,7 @@ class SummaryWriter(GraphBase):
                                              configuration_module_prefix = self.configuration_module_prefix)
         self.writer = Writer(model_params=llm_config['reasoning_model'],
                              configuration_module_prefix=self.configuration_module_prefix,
-                             enable_citations = True,
+                             enable_citations = False,
                              citation_style = "numeric",
                              min_confidence = 0.6)
         self.citations_manager = CitationsManager(model_params=llm_config['reasoning_model'],
@@ -107,8 +107,6 @@ class SummaryWriter(GraphBase):
         workflow.add_edge(start_key=START, end_key=Node.QUERY_WRITER)
         workflow.add_edge(start_key=Node.QUERY_WRITER, end_key=Node.WEB_SEARCH)
         workflow.add_edge(start_key=Node.WEB_SEARCH, end_key=Node.WRITER)
-        # workflow.add_edge(start_key=Node.WRITER, end_key=Node.CITATIONS_MANAGER)
-        # workflow.add_edge(start_key=Node.CITATIONS_MANAGER, end_key=Node.REVIEWER)
         workflow.add_edge(start_key=Node.WRITER, end_key=Node.REVIEWER)
 
         workflow.add_conditional_edges(
@@ -116,9 +114,10 @@ class SummaryWriter(GraphBase):
             path=route_research,
             path_map={
                 'continue_research': Node.WEB_SEARCH,
-                'end_research': END,
+                'end_research': Node.CITATIONS_MANAGER,
             }
         )
+        workflow.add_edge(start_key=Node.CITATIONS_MANAGER, end_key=END)
 
 
         ## Compile Graph

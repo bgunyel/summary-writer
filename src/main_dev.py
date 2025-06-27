@@ -57,6 +57,7 @@ def main():
             'max_iterations': 3,
             'max_results_per_query': 4,
             'max_tokens_per_source': 10000,
+            'min_claim_confidence': 0.7,
             'number_of_days_back': 1e6,
             'number_of_queries': 3,
             'search_category': 'general',
