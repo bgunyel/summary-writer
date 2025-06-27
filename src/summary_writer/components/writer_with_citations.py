@@ -1,6 +1,8 @@
 import copy
 import re
-from typing import Any, List, Tuple
+from typing import Any, Dict, List, Tuple
+from collections import defaultdict
+import json
 
 from langchain_core.runnables import RunnableConfig
 from langchain_core.callbacks import get_usage_metadata_callback
@@ -10,13 +12,81 @@ from ai_common import strip_thinking_tokens, get_config_from_runnable
 from ..enums import Node
 from ..state import SummaryState, WriterClaim
 
+CLAIM_EXTRACTION_INSTRUCTIONS = """
+You are an expert at analyzing text written about a topic and extracting specific claims with their sources.
 
-# Enhanced prompts with citation instructions
-WRITING_INSTRUCTIONS_WITH_CITATIONS = """
+<Goal>
+Extract all factual claims from the provided text and identify which sources support each claim.
+</Goal>
+
+The topic of the text:
+<topic>
+{topic}
+</topic>
+
+The text you are analyzing:
+<text>
+{text}
+</text>
+
+The context with sources:
+<context>
+{context}
+</context>
+
+<Requirements>
+1. Extract each distinct factual claim from the text
+2. For each claim, identify ALL source IDs that support it
+3. Assess confidence level (0.0-1.0) based on:
+   - How directly the source supports the claim
+   - Number of supporting sources
+   - Clarity and specificity of the information
+4. Record the position of each claim in the text
+5. Only extract claims that are directly supported by the sources
+</Requirements>
+
+<Output Format>
+* Format your response as a JSON object with one field:    
+    - claims: Claims you extract from the given text.
+* Each claim should have the following five fields:
+    - "text": The claim text
+    - "source_ids": Array of source IDs that support this claim
+    - "confidence": Confidence score between 0.0 and 1.0
+    - "start_position": Character position where claim starts
+    - "end_position": Character position where claim ends
+
+Provide your analysis in JSON format:
+
+{{    
+    "claims": [
+            {{
+                "text": str
+                "source_ids": List[str]
+                "confidence": float
+                "start_position": int
+                "end_position": int
+            }}
+    ],    
+}}
+
+Example:
+[
+  {{
+    "text": "Climate change is primarily caused by human activities",
+    "source_ids": ["source_1", "source_3"],
+    "confidence": 0.9,
+    "start_position": 0,
+    "end_position": 52
+  }}
+]
+</Output Format>
+"""
+
+WRITING_WITH_CITATIONS_INSTRUCTIONS = """
 You are an expert writer working on writing a summary about a given topic using the provided context.
 
 <Goal>
-Write a high quality summary of the provided context with precise source attribution.
+Write a high-quality summary of the provided context.
 </Goal>
 
 The topic you are writing about:
@@ -24,108 +94,39 @@ The topic you are writing about:
 {topic}
 </topic>
 
-The context you are going to use (with source IDs):
+The context you are going to use:
 <context>
 {context}
 </context>
 
+Citation style: {citation_style}
+
 <Requirements>
-1. Highlight every relevant information from each source.
-2. Provide a detailed overview of the key points related to the topic.
-3. Emphasize significant findings or insights.
-4. Ensure a coherent flow of information.
-5. CRITICAL: Mark every factual claim with proper source attribution.
+1. Include ALL relevant information from each source
+2. Add inline citations immediately after each claim or statement
+3. Use the specified citation style:
+   - numeric: [1], [2], [3] or [1,3,5] for multiple sources
+   - author-year: (Smith, 2023), (Jones & Brown, 2022)
+   - footnote: ¹, ², ³
+4. Ensure every factual statement has a citation
+5. Group related information logically
+6. Maintain coherent flow between paragraphs
+7. Be comprehensive but concise
 </Requirements>
 
-<Format>
-* Format your response as a JSON object with two fields:
-    - summary: The summary that is generated about the topic using the given context. Start directly with the summary, without preamble or titles.
-    - claims: Claims in your summary.
-* Each claim should have the following five fileds:
-    - text: Text of the claim taken from the summary.
-    - source_ids: The ids of sources that support your claim (e.g. src1, src2, etc.).
-    - confidence: Your confidence level in your claim (between 0 and 1, floating point)
-    - start_position: The start position of your claim in the generated summary.
-    - end_position: The end position of your claim in the generated summary.
-
-Provide your analysis in JSON format:
-
-{{
-    "summary": "string",
-    "claims": [
-            {{
-                "text": str
-                "source_ids": List[str]
-                "confidence": str
-                "start_position": str
-                "end_position": str
-            }}
-    ],    
-}}
-</Format>
-
-<Claim Instructions>
-WHAT TO MARK AS CLAIMS:
-✓ Statistics, numbers, percentages, measurements
-✓ Specific facts, dates, events, names
-✓ Direct quotes or paraphrases from sources
-✓ Research findings, study results, survey data
-✓ Any statement that could be disputed or needs verification
-
-WHAT NOT TO MARK:
-✗ General background information or common knowledge
-✗ Your own analysis or connecting statements between facts
-✗ Obvious conclusions that don't need citation
-
-CONFIDENCE LEVELS:
-- 1.0: Directly quoted or exactly stated in source
-- 0.9: Clearly supported with specific evidence in source
-- 0.8: Well-supported by source data with minor interpretation
-- 0.7: Reasonably inferred from source information
-- 0.6: Somewhat supported but requires interpretation
-- Below 0.6: Don't include the claim
-
-EXAMPLE:
-{{
-    "summary": "The renewable energy sector experienced significant growth in 2024. Solar energy capacity increased by 23% globally, while wind energy installations grew by 18%. This expansion was driven by increased government subsidies totaling $12 billion.",
-    "claims": [
-            {{
-                "text": "Solar energy capacity increased by 23% globally"
-                "source_ids": [src1]
-                "confidence": 0.95
-                "start_position": 68
-                "end_position": 115
-            }},
-            {{
-                "text": "wind energy installations grew by 18%"
-                "source_ids": [src2]
-                "confidence": 0.88
-                "start_position": 123
-                "end_position": 160
-            }},
-            {{
-                "text": "increased government subsidies totaling $12 billion"
-                "source_ids": List[src1, src2]
-                "confidence": 0.80
-                "start_position": 191
-                "end_position": 242
-            }}
-    ],    
-}}
-</Claim Instructions>
-
-<Task>
-Think carefully about the provided context first. 
-Then write a comprehensive summary using the provided context. 
-List every factual claim with proper source attribution, confidence, start position, end position.
-</Task>
+<Formatting>
+- Start directly with the summary content
+- Place citations immediately after the relevant claim
+- Use consistent citation format throughout
+- No XML tags in the output
+</Formatting>
 """
 
-EXTENDING_INSTRUCTIONS_WITH_CITATIONS = """
-You are an expert writer working on extending summary with new search results while maintaining precise source attribution.
+EXTENDING_WITH_CITATIONS_INSTRUCTIONS = """
+You are an expert writer extending an existing summary with new information.
 
 <Goal>
-Extend the existing summary with new search results, adding proper citations for all new factual claims.
+Extend the existing summary with new search results.
 </Goal>
 
 The topic of the summary:
@@ -133,57 +134,84 @@ The topic of the summary:
 {topic}
 </topic>
 
-The existing summary (may already contain citations):
+The existing summary with citations:
 <summary>
 {summary}
 </summary>
 
-The new search results (with source IDs):
+The new search results:
 <search_results>
 {search_results}
 </search_results>
 
+Citation style: {citation_style}
+Next citation number: {next_citation_number}
+
 <Requirements>
-1. Read the existing summary and new search results carefully.
-2. Compare the new information with the existing summary.
-3. For each piece of new information:
-   a. If it's related to existing points, integrate it into the relevant paragraph.
-   b. If it's entirely new but relevant, add a new paragraph with a smooth transition.
-   c. If it's not relevant to the user topic, skip it.
-4. Ensure all additions are relevant to the user's topic.
-5. Mark ALL new factual claims with proper source attribution.
-6. Preserve existing citations in the summary.
-7. Verify that your final output differs from the input summary.
+1. Integrate new information seamlessly into existing content
+2. Continue citation numbering from where the existing summary left off
+3. Add citations for all new claims
+4. Maintain the same citation style as the existing summary
+5. Update existing sections if new information provides better context
+6. Ensure no duplicate information
+7. Preserve the logical flow and structure
 </Requirements>
 
-<Citation Instructions>
-For every NEW factual statement you add, use this exact format:
-<CLAIM sources="source_id1,source_id2" confidence="0.0-1.0">"your factual claim here"</CLAIM>
-
-Apply the same citation rules as in the initial writing phase.
-Keep existing <CLAIM> tags unchanged - only add new ones for new information.
-</Citation Instructions>
-
 <Formatting>
-- Start directly with the updated summary, without preamble or titles.
+- Start directly with the updated summary
+- Maintain consistent citation format
+- No XML tags in the output
 </Formatting>
+"""
 
-<Task>
-Think carefully about the provided search results first. Then update the existing summary accordingly, adding proper citations for all new factual claims.
-</Task>
+BIBLIOGRAPHY_GENERATION_INSTRUCTIONS = """
+Generate a bibliography/reference list for the following sources used in the summary.
+
+Sources:
+<sources>
+{sources}
+</sources>
+
+Citation style: {citation_style}
+
+<Requirements>
+1. Format each source according to the citation style
+2. Order sources as appropriate for the style:
+   - numeric: In order of first appearance [1], [2], [3]
+   - author-year: Alphabetically by author's last name
+   - footnote: In order of first appearance
+3. Include all available metadata for each source
+4. Use consistent formatting throughout
+</Requirements>
+
+<Output>
+Provide only the formatted bibliography, one source per line.
+</Output>
 """
 
 
 class WriterWithCitations:
-    """Enhanced Writer class that generates summaries with claim-level citations"""
+    """
+    Writer that extracts claims, adds inline citations, and generates bibliographies.
+    """
 
     def __init__(self, model_params: dict[str, Any], configuration_module_prefix: str,
                  citation_style: str = "numeric", min_confidence: float = 0.6):
+        """
+        Initialize the WriterWithCitations.
+
+        Args:
+            model_params: Model configuration parameters
+            configuration_module_prefix: Configuration module prefix
+            citation_style: Citation style ("numeric", "author-year", "footnote")
+            min_confidence: Minimum confidence threshold for including citations
+        """
         self.model_name = model_params['model']
         self.configuration_module_prefix = configuration_module_prefix
         self.citation_style = citation_style
         self.min_confidence = min_confidence
 
+        # Initialize the LLM
         self.writer_llm = init_chat_model(
             model=model_params['model'],
             model_provider=model_params['model_provider'],
@@ -191,29 +219,216 @@ class WriterWithCitations:
             **model_params['model_args']
         )
 
-        # Pattern for extracting CLAIM tags
-        self.claim_pattern = r'<CLAIM\s+sources="([^"]*?)"\s+confidence="([^"]*?)">(.*?)</CLAIM>'
+    def extract_claims(self, content: str, sources: Dict[str, Any], topic: str) -> List[WriterClaim]:
+        """
+        Extract claims from content with their supporting sources.
+        """
+        # Format sources for extraction
+        source_context = self._format_sources_for_extraction(sources)
+
+        instructions = CLAIM_EXTRACTION_INSTRUCTIONS.format(
+            topic=topic,
+            text=content,
+            context=source_context
+        )
+
+        response = self.writer_llm.invoke(instructions, response_format = {"type": "json_object"})
+
+        # Parse the JSON response
+        try:
+            claims_data = json.loads(response.content)['claims']
+
+            claims = []
+            for claim_data in claims_data:
+                if claim_data['confidence'] >= self.min_confidence:
+                    claim_text = claim_data['text'].strip()
+
+                    # Find the actual position of this claim in the content
+                    start_pos = content.find(claim_text)
+                    if start_pos == -1:
+                        # Try finding a substring if exact match fails
+                        # This handles cases where LLM slightly modified the text
+                        words = claim_text.split()
+                        if len(words) > 3:
+                            # Try with first few words
+                            partial_text = ' '.join(words[:3])
+                            start_pos = content.find(partial_text)
+                            if start_pos != -1:
+                                # Find the end of the actual claim
+                                # Look for sentence ending punctuation
+                                end_search_start = start_pos + len(partial_text)
+                                end_markers = ['. ', '.\n', '? ', '?\n', '! ', '!\n']
+                                end_pos = len(content)
+                                for marker in end_markers:
+                                    marker_pos = content.find(marker, end_search_start)
+                                    if marker_pos != -1 and marker_pos < end_pos:
+                                        end_pos = marker_pos + 1
+                                claim_text = content[start_pos:end_pos].strip()
+
+                    if start_pos != -1:
+                        end_pos = start_pos + len(claim_text)
+
+                        claim = WriterClaim(
+                            text=claim_text,
+                            source_ids=claim_data['source_ids'],
+                            confidence=claim_data['confidence'],
+                            start_position=start_pos,
+                            end_position=end_pos
+                        )
+                        claims.append(claim)
+                    else:
+                        # Skip claims we can't locate in the content
+                        print(f"Warning: Could not locate claim in content: {claim_text[:50]}...")
+
+            return claims
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Error parsing claims: {e}")
+            return []
+
+    def add_citations_to_content(self, content: str, claims: List[WriterClaim],
+                                 existing_citations: Dict[str, int] = None) -> Tuple[str, Dict[str, int]]:
+        """
+        Add inline citations to content based on extracted claims.
+
+        Returns:
+            Tuple of (cited_content, citation_mapping)
+        """
+        if existing_citations is None:
+            existing_citations = {}
+
+        citation_mapping = existing_citations.copy()
+        next_citation_num = max(citation_mapping.values()) + 1 if citation_mapping else 1
+
+        # Sort claims by position to process in order
+        sorted_claims = sorted(claims, key=lambda c: c.start_position)
+
+        # Build cited content
+        cited_content = content
+        offset = 0
+
+        for claim in sorted_claims:
+            # Get citation numbers for this claim's sources
+            citation_nums = []
+            for source_id in claim.source_ids:
+                if source_id not in citation_mapping:
+                    citation_mapping[source_id] = next_citation_num
+                    next_citation_num += 1
+                citation_nums.append(citation_mapping[source_id])
+
+            # Format citation based on style
+            citation = self._format_citation(citation_nums)
+
+            # Insert citation after the claim
+            insert_pos = claim.end_position + offset
+            cited_content = cited_content[:insert_pos] + citation + cited_content[insert_pos:]
+            offset += len(citation)
+
+        return cited_content, citation_mapping
+
+    def generate_bibliography(self, sources: Dict[str, Any], citation_mapping: Dict[str, int], remove_thinking_tokens: bool) -> str:
+        """
+        Generate a bibliography from sources and citation mapping.
+        """
+        # Sort sources by citation number
+        sorted_sources = sorted(
+            [(source_id, sources[source_id], num) for source_id, num in citation_mapping.items()],
+            key=lambda x: x[2]
+        )
+
+        # Format sources for bibliography
+        formatted_sources = []
+        for source_id, source_data, citation_num in sorted_sources:
+            formatted_source = self._format_source_for_bibliography(source_data, citation_num)
+            formatted_sources.append(formatted_source)
+
+        instructions = BIBLIOGRAPHY_GENERATION_INSTRUCTIONS.format(
+            sources="\n".join(formatted_sources),
+            citation_style=self.citation_style
+        )
+
+        response = self.writer_llm.invoke(instructions)
+
+        bibliography = response.content
+        if remove_thinking_tokens:
+            bibliography = strip_thinking_tokens(text=bibliography)
+        bibliography = bibliography.lstrip('\n')
+
+        return bibliography
+
+    def _format_sources_for_extraction(self, sources: Dict[str, Any]) -> str:
+        """
+        Format sources with IDs for claim extraction.
+        """
+        formatted_sources = []
+        for source_id, source_data in sources.items():
+            source_text = f"[Source ID: {source_id}]\n"
+            source_text += f"Title: {source_data.get('title', 'Unknown')}\n"
+            source_text += f"Content: {source_data.get('content', '')}\n"
+            formatted_sources.append(source_text)
+
+        return "\n\n".join(formatted_sources)
+
+    def _format_citation(self, citation_nums: List[int]) -> str:
+        """
+        Format citation numbers based on citation style.
+        """
+        if self.citation_style == "numeric":
+            if len(citation_nums) == 1:
+                return f"[{citation_nums[0]}]"
+            else:
+                return f"[{','.join(map(str, sorted(citation_nums)))}]"
+        elif self.citation_style == "footnote":
+            superscript_map = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
+            if len(citation_nums) == 1:
+                return str(citation_nums[0]).translate(superscript_map)
+            else:
+                return ','.join(str(num).translate(superscript_map) for num in sorted(citation_nums))
+        else:  # author-year style would need author information
+            return f"[{','.join(map(str, sorted(citation_nums)))}]"
+
+    def _format_source_for_bibliography(self, source_data: Dict[str, Any], citation_num: int) -> str:
+        """
+        Format a source for bibliography generation.
+        """
+        parts = [f"[{citation_num}]"]
+
+        if 'author' in source_data:
+            parts.append(f"Author: {source_data['author']}")
+        if 'title' in source_data:
+            parts.append(f"Title: {source_data['title']}")
+        if 'url' in source_data:
+            parts.append(f"URL: {source_data['url']}")
+        if 'date' in source_data:
+            parts.append(f"Date: {source_data['date']}")
+
+        return " | ".join(parts)
+
+    def _get_next_citation_number(self, cited_content: str) -> int:
+        """
+        Extract the highest citation number from existing content.
+        """
+        if self.citation_style == "numeric":
+            # Find all [n] patterns
+            matches = re.findall(r'\[(\d+)\]', cited_content)
+            if matches:
+                return max(int(m) for m in matches) + 1
+        elif self.citation_style == "footnote":
+            # Find all superscript numbers
+            superscript_digits = "⁰¹²³⁴⁵⁶⁷⁸⁹"
+            normal_digits = "0123456789"
+            trans_table = str.maketrans(superscript_digits, normal_digits)
+
+            # Find all sequences of superscript digits
+            matches = re.findall(f'[{superscript_digits}]+', cited_content)
+            if matches:
+                numbers = [int(m.translate(trans_table)) for m in matches]
+                return max(numbers) + 1
+
+        return 1
 
     def run(self, state: SummaryState, config: RunnableConfig) -> SummaryState:
         """
-        Enhanced version of the Writer run method with citation support.
-
-        This method extends the original functionality to:
-        1. Generate summaries with embedded claim markers
-        2. Extract and validate claims from the LLM response
-        3. Produce both clean and cited versions of the summary
-        4. Track citation metadata in the state
-
-        Args:
-            state (SummaryState): Enhanced state that should include:
-                - All original fields from your SummaryState
-                - Optional: claims (List[WriterClaim]) - for tracking claims
-                - Optional: cited_content (str) - summary with inline citations
-                - Optional: bibliography (str) - reference list
-            config (RunnableConfig): Same as original
-
-        Returns:
-            SummaryState: Enhanced state with citation data
+        Run the writer with citations.
         """
 
         configurable = get_config_from_runnable(
@@ -221,243 +436,116 @@ class WriterWithCitations:
             config=config
         )
 
-        # Prepare context with source IDs for citation
-        formatted_context = self._format_context_with_source_ids(state)
-
-        # Select appropriate instruction template
-        if state.summary_exists:  # Extending existing summary
-            instructions = EXTENDING_INSTRUCTIONS_WITH_CITATIONS.format(
-                topic=state.topic,
-                summary=state.content,
-                search_results=formatted_context
-            )
-        else:  # Writing a new summary
-            instructions = WRITING_INSTRUCTIONS_WITH_CITATIONS.format(
-                topic=state.topic,
-                context=formatted_context
-            )
-
-        # Call LLM with citation-enhanced instructions
         with get_usage_metadata_callback() as cb:
-            summary_response = self.writer_llm.invoke(instructions)
+            if state.summary_exists:
+                # Extending existing summary
+                next_citation_num = self._get_next_citation_number(state.cited_content or state.content)
+
+                instructions = EXTENDING_WITH_CITATIONS_INSTRUCTIONS.format(
+                    topic=state.topic,
+                    summary=state.cited_content or state.content,
+                    search_results=state.source_str,
+                    citation_style=self.citation_style,
+                    next_citation_number=next_citation_num
+                )
+            else:
+                # Creating new summary with citations
+                instructions = WRITING_WITH_CITATIONS_INSTRUCTIONS.format(
+                    topic=state.topic,
+                    context=state.source_str,
+                    citation_style=self.citation_style
+                )
+
+            response = self.writer_llm.invoke(instructions)
+            new_content = response.content
+
+            if configurable.strip_thinking_tokens:
+                new_content = strip_thinking_tokens(text=new_content)
+            new_content = new_content.lstrip('\n')
+
+            # Extract claims from the new content
+            claims = self.extract_claims(
+                new_content,
+                state.unique_sources,
+                state.topic
+            )
+            state.claims.extend(claims)
+            #######################################
+            # Get existing citation mapping if we're extending
+            existing_citations = {}
+            if state.summary_exists and state.cited_content:
+                # Build mapping from existing cited content
+                all_previous_sources = {}
+                for sources_dict in state.cumulative_unique_sources[:-1]:  # Exclude current sources
+                    all_previous_sources.update(sources_dict)
+
+                for i, source_id in enumerate(all_previous_sources.keys(), 1):
+                    existing_citations[source_id] = i
+
+            # Add citations to the new content based on extracted claims
+            cited_new_content, citation_mapping = self.add_citations_to_content(
+                new_content,
+                claims,
+                existing_citations
+            )
+
+            # Update the full cited content
+            if state.summary_exists:
+                state.cited_content = state.cited_content + "\n\n" + cited_new_content
+            else:
+                state.cited_content = cited_new_content
+
+            # Update content without citations (for backward compatibility)
+            if state.summary_exists:
+                state.content = state.content + "\n\n" + new_content
+            else:
+                state.content = new_content
+
+            # Generate bibliography with all sources
+            all_sources = {}
+            for sources_dict in state.cumulative_unique_sources:
+                all_sources.update(sources_dict)
+
+            all_sources = {k: {'title': v['title'], 'content': v['content'], 'url': k} for k, v in all_sources.items()}
+            state.bibliography = self.generate_bibliography(all_sources, citation_mapping, configurable.strip_thinking_tokens)
+
+            ########################################
+            """
+            # Generate bibliography
+            all_sources = {}
+            for sources_dict in state.cumulative_unique_sources:
+                all_sources.update(sources_dict)
+
+            all_sources = {k:{'title': v['title'], 'content': v['content'], 'url': k}  for k, v in all_sources.items()}
+
+            # Build citation mapping from cited content
+            citation_mapping = {}
+            for i, source_id in enumerate(all_sources.keys(), 1):
+                citation_mapping[source_id] = i
+
+            state.bibliography = self.generate_bibliography(all_sources, citation_mapping, configurable.strip_thinking_tokens)
+
+            # Update content (for backward compatibility)
+            state.content = state.cited_content
+            """
 
             # Update token usage
-            state.token_usage[self.model_name]['input_tokens'] += cb.usage_metadata[self.model_name]['input_tokens']
-            state.token_usage[self.model_name]['output_tokens'] += cb.usage_metadata[self.model_name]['output_tokens']
+            if self.model_name not in state.token_usage:
+                state.token_usage[self.model_name] = {'input_tokens': 0, 'output_tokens': 0}
 
-            # Track step completion
+            state.token_usage[self.model_name]['input_tokens'] += cb.usage_metadata.get(self.model_name, {}).get(
+                'input_tokens', 0)
+            state.token_usage[self.model_name]['output_tokens'] += cb.usage_metadata.get(self.model_name, {}).get(
+                'output_tokens', 0)
+
             state.steps.append(Node.WRITER)
             state.summary_exists = True
 
-            # Get raw content
-            raw_content = copy.deepcopy(summary_response.content)
-
-        # Strip thinking tokens if configured
         if configurable.strip_thinking_tokens:
-            raw_content = strip_thinking_tokens(text=raw_content)
+            state.content = strip_thinking_tokens(text=state.content)
+            state.cited_content = strip_thinking_tokens(text=state.cited_content)
 
-        raw_content = raw_content.lstrip('\n')
+        state.content = state.content.lstrip('\n')
+        state.cited_content = state.cited_content.lstrip('\n')
 
-        # Process citations
-        clean_content, claims, cited_content = self._process_citations(raw_content, state)
-
-        # Update state with both versions
-        state.content = clean_content  # Original behavior - clean summary
-
-        # Add citation-enhanced fields
-        state.cited_content = cited_content
-        state.claims.extend(claims)
-        state.bibliography = self._generate_bibliography(state)
         return state
-
-    def _format_context_with_source_ids(self, state: SummaryState) -> str:
-        """
-        Format the context to include source IDs for citation.
-
-        This assumes your state.source_str contains source information.
-        You may need to adapt this based on your actual data structure.
-        """
-
-        number_of_previous_sources = sum(
-            [len(state.cumulative_unique_sources[i]) for i in range(state.iteration)]
-        ) if state.iteration > 0 else 0
-
-        formatted_sources = []
-        for i, (k, v) in enumerate(iterable=state.unique_sources.items(), start=number_of_previous_sources+1):
-            source_id = f"src{i}"
-            title = v['title']
-            content = v['content']
-            url = k
-            formatted_sources.append(f"[{source_id}] {title}\nURL: {url}\nContent: {content}")
-
-        return "\n".join(formatted_sources)
-
-
-
-    def _process_citations(self, raw_content: str, state: SummaryState) -> Tuple[str, List[WriterClaim], str]:
-        """
-        Process the LLM response to extract claims and generate both clean and cited versions.
-
-        Returns:
-            Tuple of (clean_content, extracted_claims, cited_content)
-        """
-
-        # Extract claims from the raw content
-        claims = self._extract_claims(raw_content)
-
-        # Validate claims (check confidence, source existence, etc.)
-        validated_claims = self._validate_claims(claims, state)
-
-        # Generate clean content (remove CLAIM tags)
-        clean_content = self._generate_clean_content(raw_content)
-
-        # Generate cited content (replace CLAIM tags with inline citations)
-        cited_content = self._generate_cited_content(raw_content, validated_claims)
-
-        return clean_content, validated_claims, cited_content
-
-    def _extract_claims(self, content: str) -> List[WriterClaim]:
-        """Extract claims from content containing CLAIM tags"""
-        claims = []
-
-        for match in re.finditer(self.claim_pattern, content, re.DOTALL):
-            sources_str = match.group(1)
-            confidence_str = match.group(2)
-            claim_text = match.group(3).strip()
-
-            # Parse source IDs
-            source_ids = [s.strip() for s in sources_str.split(',') if s.strip()]
-
-            # Parse confidence
-            try:
-                confidence = float(confidence_str)
-                confidence = max(0.0, min(1.0, confidence))
-            except ValueError:
-                confidence = 0.5
-
-            claims.append(WriterClaim(
-                text=claim_text,
-                source_ids=source_ids,
-                confidence=confidence,
-                start_position=match.start(),
-                end_position=match.end()
-            ))
-
-        return claims
-
-    def _validate_claims(self, claims: List[WriterClaim], state: SummaryState) -> List[WriterClaim]:
-        """Validate claims against confidence threshold and source availability"""
-        validated_claims = []
-
-        # Get available source IDs (you may need to adapt this)
-        available_sources = self._get_available_source_ids(state)
-
-        for claim in claims:
-            # Check confidence threshold
-            if claim.confidence < self.min_confidence:
-                continue
-
-            # Check if sources exist
-            valid_source_ids = [sid for sid in claim.source_ids if sid in available_sources]
-            if not valid_source_ids:
-                continue
-
-            # Update claim with valid sources only
-            claim.source_ids = valid_source_ids
-            validated_claims.append(claim)
-
-        return validated_claims
-
-    def _get_available_source_ids(self, state: SummaryState) -> set:
-        """Get set of available source IDs from the state"""
-        # This is a heuristic - adapt based on your actual data structure
-
-        if hasattr(state, 'sources') and state.sources:
-            return {f"src{i + 1}" for i in range(len(state.sources))}
-        else:
-            # Estimate from source_str - count likely sources
-            source_count = len([s for s in state.source_str.split('\n\n') if s.strip()])
-            return {f"src{i + 1}" for i in range(source_count)}
-
-    def _generate_clean_content(self, raw_content: str) -> str:
-        """Generate clean content by removing CLAIM tags"""
-        clean_content = re.sub(self.claim_pattern, r'\3', raw_content, flags=re.DOTALL)
-        return re.sub(r'\s+', ' ', clean_content).strip()
-
-    def _generate_cited_content(self, raw_content: str, validated_claims: List[WriterClaim]) -> str:
-        """Generate content with inline citations"""
-        cited_content = raw_content
-
-        # Process in reverse order to maintain text positions
-        matches = list(re.finditer(self.claim_pattern, raw_content, re.DOTALL))
-
-        for match in reversed(matches):
-            claim_text = match.group(3).strip()
-            sources_str = match.group(1)
-            source_ids = [s.strip() for s in sources_str.split(',') if s.strip()]
-
-            # Find corresponding validated claim
-            validated_claim = None
-            for claim in validated_claims:
-                if claim.text == claim_text:
-                    validated_claim = claim
-                    break
-
-            if validated_claim:
-                # Replace with claim + citation
-                citation = self._format_citation(validated_claim.source_ids)
-                replacement = claim_text + citation
-            else:
-                # Claim was filtered out, just use the text
-                replacement = claim_text
-
-            cited_content = cited_content[:match.start()] + replacement + cited_content[match.end():]
-
-        return re.sub(r'\s+', ' ', cited_content).strip()
-
-    def _format_citation(self, source_ids: List[str]) -> str:
-        """Format inline citation based on style"""
-        if not source_ids:
-            return ""
-
-        if self.citation_style == "numeric":
-            return f" [{','.join(source_ids)}]"
-        elif self.citation_style == "superscript":
-            superscript_map = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵',
-                               '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'}
-            result = ""
-            for sid in source_ids:
-                superscript = ''.join(superscript_map.get(c, c) for c in sid)
-                result += superscript
-            return result
-        else:
-            return f" [{', '.join(source_ids)}]"
-
-    def _generate_bibliography(self, state: SummaryState) -> str:
-        """Generate bibliography from claims and sources"""
-        if not hasattr(state, 'claims') or not state.claims:
-            return ""
-
-        # Collect used source IDs
-        used_sources = set()
-        for claim in state.claims:
-            used_sources.update(claim.source_ids)
-
-        # Generate bibliography entries
-        bibliography_entries = []
-
-        # If you have access to source metadata
-        if hasattr(state, 'sources') and state.sources:
-            for i, source in enumerate(state.sources):
-                source_id = f"src{i + 1}"
-                if source_id in used_sources:
-                    title = getattr(source, 'title', 'Untitled')
-                    url = getattr(source, 'url', '')
-                    entry = f"[{source_id}] {title}. {url}"
-                    bibliography_entries.append(entry)
-        else:
-            # Fallback - basic source list
-            for source_id in sorted(used_sources):
-                bibliography_entries.append(f"[{source_id}] Source {source_id}")
-
-        return "\n".join(bibliography_entries)

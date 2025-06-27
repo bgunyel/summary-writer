@@ -1,11 +1,11 @@
 from typing import Any, List
 from dataclasses import dataclass
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from ai_common import SearchQuery
 
-@dataclass
-class WriterClaim:
+
+class WriterClaim(BaseModel):
     """Represents a claim extracted by the Writer"""
     text: str
     source_ids: List[str]
@@ -38,6 +38,6 @@ class SummaryState(BaseModel):
     cumulative_unique_sources: list[dict[str, Any]]
     cumulative_search_queries: list
 
-    bibliography: str # reference list
-    cited_content: str # summary with inline citations
-    claims: List[WriterClaim] # for tracking claims
+    claims: List[WriterClaim] = Field(default_factory=list) # tracking claims
+    bibliography: str = Field(default="") # reference list
+    cited_content: str = Field(default="") # summary with inline citations
