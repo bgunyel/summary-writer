@@ -11,8 +11,8 @@ from ai_common import LlmServers, PRICE_USD_PER_MILLION_TOKENS
 def main():
 
     llm_config = {
-        'language_model': {
-            'model': 'llama-3.3-70b-versatile',
+        'small_language_model': {
+            'model': 'llama-3.1-8b-instant', # 'llama-3.3-70b-versatile',
             'model_provider': LlmServers.GROQ.value,
             'api_key': settings.GROQ_API_KEY,
             'model_args': {
@@ -25,6 +25,20 @@ def main():
                     }
                 }
             },
+        'large_language_model': {
+            'model': 'llama-3.3-70b-versatile',
+            'model_provider': LlmServers.GROQ.value,
+            'api_key': settings.GROQ_API_KEY,
+            'model_args': {
+                'temperature': 0,
+                'max_retries': 5,
+                'max_tokens': 32768,
+                'model_kwargs': {
+                    'top_p': 0.95,
+                    'service_tier': "auto",
+                }
+            }
+        },
         'reasoning_model': {
             'model': 'qwen/qwen3-32b', #'deepseek-r1-distill-llama-70b',
             'model_provider': LlmServers.GROQ.value,
@@ -41,11 +55,13 @@ def main():
             }
         }
 
-    language_model = llm_config['language_model'].get('model', '')
+    small_language_model = llm_config['small_language_model'].get('model', '')
+    large_language_model = llm_config['large_language_model'].get('model', '')
     reasoning_model = llm_config['reasoning_model'].get('model', '')
 
     topic = 'Life and Philosophy of Marcus Aurelius'
-    print(f'Language Model: {language_model}')
+    print(f'Small Language Model: {small_language_model}')
+    print(f'Large Language Model: {large_language_model}')
     print(f'Reasoning Model: {reasoning_model}')
     print('\n')
     print(f'Topic: {topic}')

@@ -32,11 +32,11 @@ class SummaryWriter(GraphBase):
 
     def __init__(self, llm_config: dict[str, Any], web_search_api_key: str) -> None:
         self.memory_saver = MemorySaver()
-        self.models = list({llm_config['language_model']['model'], llm_config['reasoning_model']['model']})
+        self.models = list({*[v['model'] for k, v in llm_config.items()]})
         self.configuration_module_prefix: Final = 'summary_writer.configuration'
-        self.query_writer = QueryWriter(model_params = llm_config['language_model'],
+        self.query_writer = QueryWriter(model_params = llm_config['large_language_model'],
                                         configuration_module_prefix = self.configuration_module_prefix)
-        self.web_search_node = WebSearchNode(model_params = llm_config['language_model'],
+        self.web_search_node = WebSearchNode(model_params = llm_config['small_language_model'],
                                              web_search_api_key = web_search_api_key,
                                              configuration_module_prefix = self.configuration_module_prefix)
         self.writer = Writer(model_params=llm_config['reasoning_model'],
