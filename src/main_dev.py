@@ -1,3 +1,4 @@
+import os
 import asyncio
 import datetime
 import time
@@ -9,6 +10,8 @@ from ai_common import LlmServers, PRICE_USD_PER_MILLION_TOKENS
 
 
 def main():
+    os.environ['LANGSMITH_API_KEY'] = settings.LANGSMITH_API_KEY
+    os.environ['LANGSMITH_TRACING'] = settings.LANGSMITH_TRACING
 
     llm_config = {
         'small_language_model': {
@@ -70,13 +73,18 @@ def main():
     config = {
         "configurable": {
             'thread_id': str(uuid4()),
-            'max_iterations': 3,
+            'max_iterations': 5,
             'max_results_per_query': 4,
             'max_tokens_per_source': 10000,
             'min_claim_confidence': 0.7,
             'number_of_days_back': 1e6,
-            'number_of_queries': 3,
+            'number_of_queries': 5,
             'search_category': 'general',
+            'search_depth': 'basic',
+            'chunks_per_source': 3,
+            'include_images': False,
+            'include_image_descriptions': False,
+            'include_favicon': False,
             'strip_thinking_tokens': True,
             }
         }

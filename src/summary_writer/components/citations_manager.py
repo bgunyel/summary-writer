@@ -268,7 +268,8 @@ class CitationsManager:
                                                         citation_style=configurable.citation_style,
                                                         remove_thinking_tokens=configurable.strip_thinking_tokens)
 
-
+        state.claims = claims
+        state.cited_content = cited_content
         return state
 
     def extract_claims(self, state: BaseModel, sources: dict[str, Any], min_claim_confidence: float) -> list[WriterClaim]:

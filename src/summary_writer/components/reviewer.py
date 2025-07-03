@@ -156,5 +156,8 @@ class Reviewer:
             state.token_usage[self.model_name]['output_tokens'] += cb.usage_metadata[self.model_name]['output_tokens']
             json_dict = json.loads(results.content)
             state.search_queries = [SearchQuery(search_query=q['query']) for q in json_dict['queries']]
+            questions  = [q['question'] for q in json_dict['follow-up questions']]
+            state.questions.append(questions)
+
 
         return state

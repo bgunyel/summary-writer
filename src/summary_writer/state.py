@@ -41,3 +41,4 @@ class SummaryState(BaseModel):
     claims: List[WriterClaim] = Field(default_factory=list) # tracking claims
     bibliography: str = Field(default="") # reference list
     cited_content: str = Field(default="") # summary with inline citations
+    questions: list[list[str]]

@@ -39,7 +39,7 @@ class SummaryWriter(GraphBase):
         self.web_search_node = WebSearchNode(model_params = llm_config['small_language_model'],
                                              web_search_api_key = web_search_api_key,
                                              configuration_module_prefix = self.configuration_module_prefix)
-        self.writer = Writer(model_params=llm_config['reasoning_model'],
+        self.writer = Writer(model_params=llm_config['large_language_model'],
                              configuration_module_prefix=self.configuration_module_prefix,
                              enable_citations = False,
                              citation_style = "numeric",
@@ -66,6 +66,7 @@ class SummaryWriter(GraphBase):
             bibliography='',
             cited_content='',
             claims=[],
+            questions=[],
         )
         out_state = await self.graph.ainvoke(in_state, config)
         out_dict = {
